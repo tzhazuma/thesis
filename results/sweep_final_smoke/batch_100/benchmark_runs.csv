@@ -1,0 +1,2 @@
+solver,seed,samples,mean_step_time,std_step_time,pressure_variance,temperature_mean,temperature_std,energy_drift_per_time,area_per_lipid_mean,area_per_lipid_std,area_per_lipid_drift_per_time,thickness_proxy_mean,thickness_proxy_std,thickness_proxy_drift_per_time,step_time_stats_mean
+rbsog,42.0,11.0,0.027933856099314817,0.0010328458834816068,1.2152644018626027e-06,1.002973138274086,0.0033748390384535434,217.3917029411123,3.999311761693971,0.00043235862808177277,-0.006867190271261622,6.380521132820445,0.006498897862224516,0.010228243978423666,0.027933856099314817

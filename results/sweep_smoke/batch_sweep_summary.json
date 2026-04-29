@@ -1,0 +1,23 @@
+{
+  "baseline_pppm": {
+    "mean_step_time": 0.0019110961517211623,
+    "pressure_variance": 0.0003183369019808506
+  },
+  "rows": [
+    {
+      "batch_size": 50.0,
+      "mean_step_time": 0.009743548074486451,
+      "pressure_variance": 2.1078479408547615e-06,
+      "speedup_vs_pppm": 0.19613965437553296,
+      "variance_ratio_vs_pppm": 0.006621437627050722
+    },
+    {
+      "batch_size": 100.0,
+      "mean_step_time": 0.01921475000339202,
+      "pressure_variance": 1.217910640714005e-06,
+      "speedup_vs_pppm": 0.09945984992694636,
+      "variance_ratio_vs_pppm": 0.0038258544112717034
+    }
+  ],
+  "pareto_plot": "batch_sweep_pareto.png"
+}

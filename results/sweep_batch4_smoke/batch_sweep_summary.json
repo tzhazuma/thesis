@@ -1,0 +1,37 @@
+{
+  "baseline_pppm": {
+    "mean_step_time": 0.0046001780785680305,
+    "pressure_variance": 0.0002796908554191762
+  },
+  "rows": [
+    {
+      "batch_size": 50.0,
+      "mean_step_time": 0.010334569210235421,
+      "pressure_variance": 2.4509218258766317e-05,
+      "speedup_vs_pppm": 0.44512528630724013,
+      "variance_ratio_vs_pppm": 0.08762967320484627,
+      "is_pareto": 1.0,
+      "utopia_score": 0.0,
+      "recommended": 1.0
+    },
+    {
+      "batch_size": 100.0,
+      "mean_step_time": 0.018515079999023357,
+      "pressure_variance": 0.00012265187701956509,
+      "speedup_vs_pppm": 0.24845574951934762,
+      "variance_ratio_vs_pppm": 0.43852658977979514,
+      "is_pareto": 0.0,
+      "utopia_score": 1.41421355508177,
+      "recommended": 0.0
+    }
+  ],
+  "recommended_batch": {
+    "batch_size": 50.0,
+    "mean_step_time": 0.010334569210235421,
+    "pressure_variance": 2.4509218258766317e-05,
+    "speedup_vs_pppm": 0.44512528630724013,
+    "variance_ratio_vs_pppm": 0.08762967320484627,
+    "utopia_score": 0.0
+  },
+  "pareto_plot": "batch_sweep_pareto.png"
+}

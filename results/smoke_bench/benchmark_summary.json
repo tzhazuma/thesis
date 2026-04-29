@@ -1,0 +1,21 @@
+{
+  "n_total_runs": 4.0,
+  "by_solver": [
+    {
+      "solver": "pppm",
+      "n_runs": 2.0,
+      "mean_step_time": 0.0022981510010140482,
+      "pressure_variance": 1.4922316007274056e-05,
+      "temperature_mean": 1.0096778947171048,
+      "energy_drift_per_time": -5.881724194121659
+    },
+    {
+      "solver": "rbsog",
+      "n_runs": 2.0,
+      "mean_step_time": 0.5751272862580663,
+      "pressure_variance": 5.926437391171057e-07,
+      "temperature_mean": 1.0071544274083162,
+      "energy_drift_per_time": 116.94245743923707
+    }
+  ]
+}

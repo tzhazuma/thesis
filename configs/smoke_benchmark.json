@@ -1,0 +1,20 @@
+{
+  "solvers": "pppm,rbsog",
+  "steps": 500,
+  "sample_interval": 10,
+  "seeds": 3,
+  "n_lipids": 128,
+  "n_solvent": 512,
+  "box": [16.0, 16.0, 20.0],
+  "temperature": 1.0,
+  "pressure": 1.0,
+  "thermostat_tau": 0.2,
+  "barostat_tau": 1.0,
+  "compressibility": 0.001,
+  "grid": [32, 32, 32],
+  "batch_size": 100,
+  "cutoff_short": 1.2,
+  "sog_terms": 12,
+  "seed": 42,
+  "out": "results/benchmark_main"
+}

@@ -1,0 +1,10 @@
+{
+  "samples": 5.0,
+  "mean_step_time": 0.5942579418071545,
+  "std_step_time": 0.01415563464337895,
+  "pressure_variance": 1.6371030552501993e-06,
+  "temperature_mean": 1.042749952101395,
+  "temperature_std": 0.004326614769119278,
+  "energy_drift_per_time": -746.5905404364644,
+  "step_time_stats_mean": 0.5942579418071545
+}

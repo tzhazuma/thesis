@@ -1,0 +1,17 @@
+{
+  "n_total_runs": 1.0,
+  "by_solver": [
+    {
+      "solver": "pppm",
+      "n_runs": 1.0,
+      "mean_step_time": 0.0019110961517211623,
+      "pressure_variance": 0.0003183369019808506,
+      "temperature_mean": 1.0032576333187067,
+      "energy_drift_per_time": -39.49856796906096,
+      "area_per_lipid_std": 0.000550326780953751,
+      "thickness_proxy_std": 0.037272035848724135,
+      "area_per_lipid_drift_per_time": -0.007377942093452272,
+      "thickness_proxy_drift_per_time": -0.4983309278526928
+    }
+  ]
+}

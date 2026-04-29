@@ -1,0 +1,11 @@
+{
+  "solver": "rbsog",
+  "seed": 42,
+  "n_lipids": 128,
+  "n_solvent": 128,
+  "box": [
+    16.0,
+    16.0,
+    20.0
+  ],
+  "sim_config": 

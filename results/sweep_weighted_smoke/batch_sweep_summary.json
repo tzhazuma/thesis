@@ -1,0 +1,62 @@
+{
+  "baseline_pppm": {
+    "mean_step_time": 0.00165880908424893,
+    "pressure_variance": 0.0002849128372809309
+  },
+  "objective_weights": {
+    "time": 0.6666666666666666,
+    "variance": 0.3333333333333333
+  },
+  "rows": [
+    {
+      "batch_size": 50.0,
+      "mean_step_time": 0.005255699621283698,
+      "pressure_variance": 6.286323576484306e-05,
+      "speedup_vs_pppm": 0.31562098365198576,
+      "variance_ratio_vs_pppm": 0.22064023637818184,
+      "is_pareto": 1.0,
+      "utopia_score": 0.018145871366409008,
+      "recommended": 1.0
+    },
+    {
+      "batch_size": 100.0,
+      "mean_step_time": 0.01098257194146106,
+      "pressure_variance": 0.00010218869655736487,
+      "speedup_vs_pppm": 0.1510401291328351,
+      "variance_ratio_vs_pppm": 0.3586665224796605,
+      "is_pareto": 0.0,
+      "utopia_score": 0.5907393812865178,
+      "recommended": 0.0
+    },
+    {
+      "batch_size": 200.0,
+      "mean_step_time": 0.022056911202882615,
+      "pressure_variance": 6.15871464245419e-05,
+      "speedup_vs_pppm": 0.075205864909686,
+      "variance_ratio_vs_pppm": 0.21616136012788886,
+      "is_pareto": 1.0,
+      "utopia_score": 0.3668912083846489,
+      "recommended": 0.0
+    },
+    {
+      "batch_size": 400.0,
+      "mean_step_time": 0.042645889132365805,
+      "pressure_variance": 8.065235739996149e-05,
+      "speedup_vs_pppm": 0.038897279855046756,
+      "variance_ratio_vs_pppm": 0.2830773024117419,
+      "is_pareto": 0.0,
+      "utopia_score": 0.8603283503147281,
+      "recommended": 0.0
+    }
+  ],
+  "recommended_batch": {
+    "batch_size": 50.0,
+    "mean_step_time": 0.005255699621283698,
+    "pressure_variance": 6.286323576484306e-05,
+    "speedup_vs_pppm": 0.31562098365198576,
+    "variance_ratio_vs_pppm": 0.22064023637818184,
+    "utopia_score": 0.018145871366409008
+  },
+  "pareto_plot": "batch_sweep_pareto.png",
+  "paper_table_csv": "batch_sweep_paper_table.csv"
+}

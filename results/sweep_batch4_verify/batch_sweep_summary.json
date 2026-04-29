@@ -1,0 +1,47 @@
+{
+  "baseline_pppm": {
+    "mean_step_time": 0.0035991914746340455,
+    "pressure_variance": 0.00027362889692173213
+  },
+  "rows": [
+    {
+      "batch_size": 50.0,
+      "mean_step_time": 0.009519291668160196,
+      "pressure_variance": 6.150742897276585e-06,
+      "speedup_vs_pppm": 0.37809446333832786,
+      "variance_ratio_vs_pppm": 0.02247841133181165,
+      "is_pareto": 1.0,
+      "utopia_score": 0.0,
+      "recommended": 1.0
+    },
+    {
+      "batch_size": 100.0,
+      "mean_step_time": 0.016565328427878695,
+      "pressure_variance": 6.767972254278305e-06,
+      "speedup_vs_pppm": 0.21727256965076344,
+      "variance_ratio_vs_pppm": 0.024734128341036263,
+      "is_pareto": 0.0,
+      "utopia_score": 0.8204685910148218,
+      "recommended": 0.0
+    },
+    {
+      "batch_size": 200.0,
+      "mean_step_time": 0.03253654264249019,
+      "pressure_variance": 6.961581741301175e-06,
+      "speedup_vs_pppm": 0.1106199731846672,
+      "variance_ratio_vs_pppm": 0.02544169062411724,
+      "is_pareto": 0.0,
+      "utopia_score": 1.4142126902755063,
+      "recommended": 0.0
+    }
+  ],
+  "recommended_batch": {
+    "batch_size": 50.0,
+    "mean_step_time": 0.009519291668160196,
+    "pressure_variance": 6.150742897276585e-06,
+    "speedup_vs_pppm": 0.37809446333832786,
+    "variance_ratio_vs_pppm": 0.02247841133181165,
+    "utopia_score": 0.0
+  },
+  "pareto_plot": "batch_sweep_pareto.png"
+}

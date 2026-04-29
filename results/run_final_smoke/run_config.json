@@ -1,0 +1,40 @@
+{
+  "solver": "rbsog",
+  "seed": 42,
+  "n_lipids": 128,
+  "n_solvent": 512,
+  "box": [
+    16.0,
+    16.0,
+    20.0
+  ],
+  "sim_config": {
+    "steps": 100,
+    "dt": 0.002,
+    "sample_interval": 10,
+    "target_temperature": 1.0,
+    "thermostat_tau": 0.2,
+    "target_pressure": 1.0,
+    "barostat_tau": 1.0,
+    "compressibility": 0.001
+  },
+  "grid": [
+    32,
+    32,
+    32
+  ],
+  "batch_size": 100,
+  "cutoff_short": 1.2,
+  "sog_terms": 12,
+  "neighbor_skin": 0.3,
+  "neighbor_rebuild_interval": 10,
+  "use_numba": true,
+  "stability_summary": {
+    "area_per_lipid_mean": 3.9993118573535584,
+    "area_per_lipid_std": 0.000432367066794128,
+    "area_per_lipid_drift_per_time": -0.006867324628812544,
+    "thickness_proxy_mean": 6.380586704603649,
+    "thickness_proxy_std": 0.006510433427159937,
+    "thickness_proxy_drift_per_time": 0.011013025479113661
+  }
+}

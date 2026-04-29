@@ -1,0 +1,16 @@
+{
+  "samples": 21.0,
+  "mean_step_time": 0.00950465090517398,
+  "std_step_time": 0.0034843309103303037,
+  "pressure_variance": 5.745828745854843e-06,
+  "temperature_mean": 1.0127137029863167,
+  "temperature_std": 0.011508851554466584,
+  "energy_drift_per_time": 102.00291328339229,
+  "area_per_lipid_mean": 3.9986277111242052,
+  "area_per_lipid_std": 0.0008286509979012955,
+  "area_per_lipid_drift_per_time": -0.006851217185862405,
+  "thickness_proxy_mean": 6.419536117960043,
+  "thickness_proxy_std": 0.05204069698385576,
+  "thickness_proxy_drift_per_time": 0.38046643688988735,
+  "step_time_stats_mean": 0.00950465090517398
+}

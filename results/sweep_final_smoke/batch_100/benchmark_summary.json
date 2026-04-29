@@ -1,0 +1,17 @@
+{
+  "n_total_runs": 1.0,
+  "by_solver": [
+    {
+      "solver": "rbsog",
+      "n_runs": 1.0,
+      "mean_step_time": 0.027933856099314817,
+      "pressure_variance": 1.2152644018626027e-06,
+      "temperature_mean": 1.002973138274086,
+      "energy_drift_per_time": 217.3917029411123,
+      "area_per_lipid_std": 0.00043235862808177277,
+      "thickness_proxy_std": 0.006498897862224516,
+      "area_per_lipid_drift_per_time": -0.006867190271261622,
+      "thickness_proxy_drift_per_time": 0.010228243978423666
+    }
+  ]
+}
