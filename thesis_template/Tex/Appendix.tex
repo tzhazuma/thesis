@@ -1,335 +1,241 @@
-\chapter{代码实现}\label{appendix:code}
+\chapter{实现补充与复现实验说明}\label{appendix:code}
 
-\section{RBSOG求解器核心代码}
+\section{真实实现说明}
 
-以下是RBSOG求解器的核心实现代码：
+附录不再给出与仓库实现不一致的示例代码，而是摘录当前仓库中的真实核心实现，并用少量注释说明其与正文算法描述的对应关系。本文涉及的核心源码主要位于 \path{src/rbsog_md/forces/rbsog.py}、\path{src/rbsog_md/forces/neighbor.py}、\path{src/rbsog_md/forces/sog.py} 与 \path{src/rbsog_md/benchmark.py}。
 
-\begin{lstlisting}[language=Python, caption=RBSOG求解器核心代码]
-import numpy as np
-from typing import Tuple, List
+当前实现有三个与正文结论直接相关的特征：
+
+（1）短程库仑相互作用由Verlet近邻表求解器负责，支持Numba加速；
+
+（2）长程部分不是简单地“抽取一个固定批量内的所有粒子对”，而是对粒子索引按重要性分布进行采样，再使用重要性权重进行无偏校正；
+
+（3）SOG核通过最小二乘拟合得到，并在给定盒子尺寸下自动重建。
+
+\section{RBSOG求解器真实核心代码节选}
+
+下面节选自 \path{src/rbsog_md/forces/rbsog.py}。这一实现展示了：先计算短程结果，再对长程部分进行重要性采样，最后将两部分贡献合并。
+
+\begin{lstlisting}[language=Python, caption=RBSOG求解器真实核心代码节选]
+@dataclass
+class RBSOGConfig:
+    batch_size: int = 100
+    cutoff_short: float = 1.2
+    sog_terms: int = 12
+    r_min: float = 0.15
+    importance_exponent: float = 1.0
+    neighbor_skin: float = 0.3
+    neighbor_rebuild_interval: int = 10
+    use_numba: bool = True
+
 
 class RBSOGSolver:
-    """RBSOG long-range electrostatics solver."""
-    
-    def __init__(self, 
-                 grid_shape: Tuple[int, int, int],
-                 batch_size: int,
-                 cutoff_short: float,
-                 sog_terms: int,
-                 neighbor_skin: float,
-                 neighbor_rebuild_interval: int,
-                 use_numba: bool = True):
-        """Initialize RBSOG solver.
-        
-        Args:
-            grid_shape: Grid dimensions for PPPM-like baseline
-            batch_size: Number of particles in random batch
-            cutoff_short: Short-range cutoff distance
-            sog_terms: Number of SOG terms
-            neighbor_skin: Skin distance for neighbor list
-            neighbor_rebuild_interval: Steps between neighbor list rebuilds
-            use_numba: Whether to use numba JIT acceleration
-        """
-        self.grid_shape = grid_shape
-        self.batch_size = batch_size
-        self.cutoff_short = cutoff_short
-        self.sog_terms = sog_terms
-        self.neighbor_skin = neighbor_skin
-        self.neighbor_rebuild_interval = neighbor_rebuild_interval
-        self.use_numba = use_numba
-        
-        # Initialize SOG parameters
-        self._init_sog_parameters()
-        
-        # Initialize neighbor list
-        self._init_neighbor_list()
-    
-    def _init_sog_parameters(self):
-        """Initialize SOG decomposition parameters."""
-        # Uniform distribution of decay parameters
-        self.alpha = np.linspace(0.1, 10.0, self.sog_terms)
-        
-        # Optimize weights using least squares fitting
-        self.weights = self._optimize_weights()
-    
-    def _optimize_weights(self):
-        """Optimize SOG weights using least squares fitting."""
-        # Build matrix for least squares
-        r = np.linspace(0.1, 10.0, 1000)
-        A = np.exp(-np.outer(r**2, self.alpha))
-        b = 1.0 / r
-        
-        # Solve least squares problem
-        weights, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
-        return weights
-    
-    def _init_neighbor_list(self):
-        """Initialize neighbor list."""
-        self.neighbor_list = []
-        self.last_positions = None
-    
-    def compute_forces(self, 
-                      positions: np.ndarray, 
-                      charges: np.ndarray,
-                      box: np.ndarray) -> np.ndarray:
-        """Compute forces on all particles.
-        
-        Args:
-            positions: Particle positions (N x 3)
-            charges: Particle charges (N,)
-            box: Box dimensions (3,)
-            
-        Returns:
-            forces: Forces on all particles (N x 3)
-        """
-        N = len(positions)
-        forces = np.zeros_like(positions)
-        
-        # Update neighbor list if needed
-        if self._need_neighbor_list_update(positions):
-            self._update_neighbor_list(positions, box)
-        
-        # Compute short-range forces
-        forces += self._compute_short_range(positions, charges, box)
-        
-        # Compute long-range forces using random batch sampling
-        forces += self._compute_long_range(positions, charges, box)
-        
-        return forces
-    
-    def _need_neighbor_list_update(self, positions: np.ndarray) -> bool:
-        """Check if neighbor list needs update."""
-        if self.last_positions is None:
+    name = "rbsog"
+
+    def __init__(self, config: RBSOGConfig) -> None:
+        self.config = config
+        self.short_range_solver = NeighborListCoulombSolver(
+            cutoff=config.cutoff_short,
+            skin=config.neighbor_skin,
+            rebuild_interval=config.neighbor_rebuild_interval,
+            use_numba=config.use_numba,
+        )
+        self.long_range_jit_enabled = bool(config.use_numba and _NUMBA_AVAILABLE)
+        self.kernel: SOGKernel | None = None
+        self.kernel_box: np.ndarray | None = None
+
+    def _ensure_kernel(self, box: np.ndarray) -> None:
+        if self.kernel is not None and self.kernel_box is not None and np.allclose(box, self.kernel_box):
+            return
+        r_max = 0.5 * float(np.min(box))
+        self.kernel = fit_sog_kernel(
+            r_min=self.config.r_min,
+            r_max=r_max,
+            n_terms=self.config.sog_terms,
+        )
+        self.kernel_box = box.copy()
+
+    def compute(self, system: ParticleSystem, rng: np.random.Generator | None = None) -> ForceResult:
+        if rng is None:
+            rng = np.random.default_rng()
+
+        self._ensure_kernel(system.box)
+        assert self.kernel is not None
+
+        short_result = self.short_range_solver.compute(system)
+        forces = short_result.forces.copy()
+        potential = short_result.potential
+        virial = short_result.virial
+
+        positions = system.positions
+        charges = system.charges
+        n_particles = system.n_particles
+        m_samples = max(self.config.batch_size * n_particles, 1)
+
+        q_abs = np.abs(charges) + 1e-6
+        proposal = q_abs**self.config.importance_exponent
+        proposal /= np.sum(proposal)
+
+        i_all = rng.choice(n_particles, size=m_samples, p=proposal)
+        j_all = rng.choice(n_particles, size=m_samples, p=proposal)
+        mask_not_self = i_all != j_all
+
+        i_idx = i_all[mask_not_self]
+        j_idx = j_all[mask_not_self]
+        displacement = minimum_image(positions[j_idx] - positions[i_idx], system.box)
+        r_sq = np.einsum("ij,ij->i", displacement, displacement)
+
+        cutoff_sq = self.config.cutoff_short * self.config.cutoff_short
+        r_min_sq = self.config.r_min * self.config.r_min
+        mask_long = (r_sq > cutoff_sq) & (r_sq > r_min_sq)
+
+        i_valid = i_idx[mask_long]
+        j_valid = j_idx[mask_long]
+        disp_valid = displacement[mask_long]
+        r_sq_valid = r_sq[mask_long]
+
+        pair_prob = proposal[i_valid] * proposal[j_valid]
+        sample_weights = 1.0 / (m_samples * pair_prob)
+
+        pref = self.kernel.force_prefactor(r_sq_valid)
+        qij = charges[i_valid] * charges[j_valid]
+        pair_force = (qij * pref)[:, None] * disp_valid
+
+        scaled_force = sample_weights[:, None] * pair_force
+        np.add.at(forces, i_valid, scaled_force)
+        np.add.at(forces, j_valid, -scaled_force)
+
+        pair_potential = qij * self.kernel.evaluate_from_r_sq(r_sq_valid)
+        potential += float(np.sum(0.5 * sample_weights * pair_potential))
+        virial += float(np.sum(0.5 * sample_weights * np.einsum("ij,ij->i", disp_valid, pair_force)))
+
+        return ForceResult(forces=forces, potential=potential, virial=virial)
+\end{lstlisting}
+
+这一节选说明，正文中“随机批量采样”的实现应理解为“基于粒子电荷幅值的成对重要性采样”，而不是简单的均匀批量抽样。
+
+\section{近邻表与短程求解真实实现节选}
+
+下面代码节选自 \path{src/rbsog_md/forces/neighbor.py}，展示了Verlet近邻表的重建判据和短程库仑求解流程。
+
+\begin{lstlisting}[language=Python, caption=近邻表与短程求解真实代码节选]
+@dataclass
+class VerletNeighborList:
+    cutoff: float
+    skin: float = 0.3
+    rebuild_interval: int = 10
+
+    @property
+    def pair_cutoff(self) -> float:
+        return self.cutoff + self.skin
+
+    def _needs_rebuild(self, system: ParticleSystem) -> bool:
+        if self._pairs is None or self._ref_positions is None or self._ref_box is None:
             return True
-        
-        # Check if any particle has moved more than skin/2
-        displacement = np.max(np.linalg.norm(
-            positions - self.last_positions, axis=1))
-        return displacement > self.neighbor_skin / 2
-    
-    def _update_neighbor_list(self, positions: np.ndarray, box: np.ndarray):
-        """Update neighbor list."""
-        N = len(positions)
-        self.neighbor_list = []
-        
-        for i in range(N):
-            neighbors = []
-            for j in range(i + 1, N):
-                # Compute distance with periodic boundary conditions
-                dr = positions[i] - positions[j]
-                dr -= box * np.round(dr / box)
-                r = np.linalg.norm(dr)
-                
-                if r < self.cutoff_short + self.neighbor_skin:
-                    neighbors.append(j)
-            
-            self.neighbor_list.append(neighbors)
-        
-        self.last_positions = positions.copy()
-    
-    def _compute_short_range(self, 
-                            positions: np.ndarray, 
-                            charges: np.ndarray,
-                            box: np.ndarray) -> np.ndarray:
-        """Compute short-range forces."""
-        N = len(positions)
-        forces = np.zeros_like(positions)
-        
-        for i in range(N):
-            for j in self.neighbor_list[i]:
-                # Compute distance with periodic boundary conditions
-                dr = positions[i] - positions[j]
-                dr -= box * np.round(dr / box)
-                r = np.linalg.norm(dr)
-                
-                if r < self.cutoff_short:
-                    # Compute short-range force
-                    f = charges[i] * charges[j] / r**2
-                    f *= np.erfc(self.alpha[0] * r)
-                    forces[i] += f * dr / r
-                    forces[j] -= f * dr / r
-        
-        return forces
-    
-    def _compute_long_range(self, 
-                           positions: np.ndarray, 
-                           charges: np.ndarray,
-                           box: np.ndarray) -> np.ndarray:
-        """Compute long-range forces using random batch sampling."""
-        N = len(positions)
-        forces = np.zeros_like(positions)
-        
-        # Random batch sampling
-        batch_indices = np.random.choice(N, 
-                                        size=min(self.batch_size, N), 
-                                        replace=False)
-        
-        # Compute long-range forces within batch
-        for i in batch_indices:
-            for j in batch_indices:
-                if i < j:
-                    # Compute distance with periodic boundary conditions
-                    dr = positions[i] - positions[j]
-                    dr -= box * np.round(dr / box)
-                    r = np.linalg.norm(dr)
-                    
-                    # Compute long-range force using SOG
-                    f = 0.0
-                    for m in range(self.sog_terms):
-                        f += self.weights[m] * np.exp(-self.alpha[m] * r**2)
-                    
-                    f *= charges[i] * charges[j]
-                    forces[i] += f * dr / r
-                    forces[j] -= f * dr / r
-        
-        # Scale forces for statistical unbiasedness
-        scale = (N / self.batch_size)**2
-        forces *= scale
-        
-        return forces
+        if not np.allclose(system.box, self._ref_box):
+            return True
+        if self._steps_since_build >= self.rebuild_interval:
+            return True
+        if self.skin <= 0.0:
+            return False
+
+        displacement = minimum_image(system.positions - self._ref_positions, system.box)
+        max_disp_sq = float(np.max(np.einsum("ij,ij->i", displacement, displacement)))
+        return max_disp_sq > (0.5 * self.skin) ** 2
+
+
+class NeighborListCoulombSolver:
+    def compute(self, system: ParticleSystem, rng: np.random.Generator | None = None) -> ForceResult:
+        del rng
+        pairs = self.neighbor_list.get_pairs(system)
+        if pairs.size == 0:
+            return ForceResult(forces=np.zeros_like(system.positions), potential=0.0, virial=0.0)
+
+        return self._compute_vectorized(
+            positions=system.positions,
+            charges=system.charges,
+            box=system.box,
+            pairs=pairs,
+            cutoff_sq=self.cutoff * self.cutoff,
+            softening_sq=self.softening * self.softening,
+        )
 \end{lstlisting}
 
-\section{基准测试脚本}
+\section{SOG核拟合真实实现节选}
 
-以下是基准测试的脚本代码：
+下面代码节选自仓库中的SOG核拟合实现文件：
 
-\begin{lstlisting}[language=Python, caption=基准测试脚本]
-import argparse
-import json
-from pathlib import Path
-import numpy as np
-from rbsog_md.benchmark import run_benchmark
+\noindent\path{src/rbsog_md/forces/sog.py}
 
-def main():
-    parser = argparse.ArgumentParser(
-        description='Run PPPM vs RBSOG benchmark')
-    parser.add_argument('--solvers', default='pppm,rbsog',
-                       help='Comma-separated solver list')
-    parser.add_argument('--steps', type=int, default=1000,
-                       help='Number of simulation steps')
-    parser.add_argument('--seeds', type=int, default=3,
-                       help='Number of random seeds')
-    parser.add_argument('--batch-size', type=int, default=100,
-                       help='RBSOG batch size')
-    parser.add_argument('--out', type=Path, default=Path('results/benchmark'),
-                       help='Output directory')
-    
-    args = parser.parse_args()
-    
-    # Create output directory
-    args.out.mkdir(parents=True, exist_ok=True)
-    
-    # Run benchmark
-    result = run_benchmark(
-        out_dir=args.out,
-        solver_names=args.solvers.split(','),
-        seeds=list(range(42, 42 + args.seeds)),
-        steps=args.steps,
-        batch_size=args.batch_size,
-    )
-    
-    # Print summary
-    print('Benchmark finished')
-    for row in result['summary']['by_solver']:
-        print(f"{row['solver']}: "
-              f"mean_step_time={row['mean_step_time']:.6f} s, "
-              f"pressure_variance={row['pressure_variance']:.6f}")
+其核心是：在给定$[r_{\min}, r_{\max}]$区间内，对$1/r$进行最小二乘拟合，得到用于长程近似的高斯核参数。
 
-if __name__ == '__main__':
-    main()
+\begin{lstlisting}[language=Python, caption=SOG核拟合真实代码节选]
+def fit_sog_kernel(
+    r_min: float,
+    r_max: float,
+    n_terms: int = 12,
+    n_samples: int = 4096,
+) -> SOGKernel:
+    alpha_min = 0.5 / (r_max * r_max)
+    alpha_max = 8.0 / (r_min * r_min)
+    alphas = np.geomspace(alpha_min, alpha_max, n_terms)
+
+    r = np.geomspace(r_min, r_max, n_samples)
+    design = np.exp(-np.outer(r * r, alphas))
+    target = 1.0 / r
+
+    weights, _, _, _ = np.linalg.lstsq(design, target, rcond=None)
+    weights = np.clip(weights, 0.0, None)
+
+    return SOGKernel(alphas=alphas, weights=weights, r_min=r_min, r_max=r_max)
 \end{lstlisting}
 
-\section{数据分析脚本}
+\section{复现实验命令}
 
-以下是数据分析的脚本代码：
+本文最终采用的实验流程与仓库中的命令行入口一致。对应协议可见 \path{docs/experiment_protocol.md}，核心命令如下：
 
-\begin{lstlisting}[language=Python, caption=数据分析脚本]
-import json
-from pathlib import Path
-import numpy as np
-import matplotlib.pyplot as plt
+\begin{lstlisting}[language=bash, caption=论文核心实验命令]
+# PPPM vs RBSOG 主基准
+rbsog-md benchmark \
+  --solvers pppm,rbsog \
+  --steps 1000 \
+  --sample-interval 20 \
+  --seeds 3 \
+  --n-lipids 128 \
+  --n-solvent 512 \
+  --batch-size 100 \
+  --grid 32 32 32 \
+  --out results/thesis_final_benchmark_main
 
-def load_benchmark_data(results_dir: Path):
-    """Load benchmark data from results directory."""
-    data = {}
-    
-    for solver_dir in results_dir.iterdir():
-        if solver_dir.is_dir() and solver_dir.name in ['pppm', 'rbsog']:
-            solver = solver_dir.name
-            data[solver] = []
-            
-            for seed_dir in solver_dir.iterdir():
-                if seed_dir.is_dir():
-                    summary_file = seed_dir / 'summary.json'
-                    if summary_file.exists():
-                        with open(summary_file) as f:
-                            summary = json.load(f)
-                            data[solver].append(summary)
-    
-    return data
+# 批量大小扫描
+rbsog-md sweep-batch \
+  --steps 1000 \
+  --sample-interval 20 \
+  --seeds 3 \
+  --batch-sizes 50,100,200,400 \
+  --objective-time-weight 2 \
+  --objective-variance-weight 1 \
+  --out results/thesis_final_batch_sweep
 
-def compute_statistics(data):
-    """Compute statistics for each solver."""
-    stats = {}
-    
-    for solver, runs in data.items():
-        step_times = [r['mean_step_time'] for r in runs]
-        pressure_vars = [r['pressure_variance'] for r in runs]
-        
-        stats[solver] = {
-            'mean_step_time': np.mean(step_times),
-            'std_step_time': np.std(step_times),
-            'mean_pressure_variance': np.mean(pressure_vars),
-            'std_pressure_variance': np.std(pressure_vars),
-        }
-    
-    return stats
+# JIT 消融
+rbsog-md benchmark \
+  --solvers rbsog \
+  --steps 400 \
+  --sample-interval 10 \
+  --seeds 2 \
+  --batch-size 100 \
+  --out results/thesis_ablation_jit_on
 
-def plot_comparison(stats, output_dir: Path):
-    """Plot comparison between solvers."""
-    solvers = list(stats.keys())
-    step_times = [stats[s]['mean_step_time'] for s in solvers]
-    pressure_vars = [stats[s]['mean_pressure_variance'] for s in solvers]
-    
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-    
-    # Plot step times
-    ax1.bar(solvers, step_times)
-    ax1.set_ylabel('Mean Step Time (s)')
-    ax1.set_title('Computational Performance')
-    
-    # Plot pressure variances
-    ax2.bar(solvers, pressure_vars)
-    ax2.set_ylabel('Pressure Variance')
-    ax2.set_title('Statistical Stability')
-    
-    plt.tight_layout()
-    plt.savefig(output_dir / 'solver_comparison.png', dpi=300)
-    plt.close()
-
-def main():
-    results_dir = Path('results/benchmark_main')
-    output_dir = Path('analysis')
-    output_dir.mkdir(exist_ok=True)
-    
-    # Load data
-    data = load_benchmark_data(results_dir)
-    
-    # Compute statistics
-    stats = compute_statistics(data)
-    
-    # Print statistics
-    for solver, s in stats.items():
-        print(f'{solver}:')
-        print(f'  Mean step time: {s["mean_step_time"]:.6f} '
-              f'(+/- {s["std_step_time"]:.6f})')
-        print(f'  Mean pressure variance: {s["mean_pressure_variance"]:.6f} '
-              f'(+/- {s["std_pressure_variance"]:.6f})')
-    
-    # Plot comparison
-    plot_comparison(stats, output_dir)
-    print(f'Plot saved to {output_dir / "solver_comparison.png"}')
-
-if __name__ == '__main__':
-    main()
+rbsog-md benchmark \
+  --solvers rbsog \
+  --steps 400 \
+  --sample-interval 10 \
+  --seeds 2 \
+  --batch-size 100 \
+  --disable-numba \
+  --out results/thesis_ablation_jit_off
 \end{lstlisting}
+
+\section{附录小结}
+
+附录的目的不是重复展示与正文无关的大段模板代码，而是说明论文中对RBSOG、近邻表、SOG核拟合以及实验流程的描述都能在当前仓库真实实现中找到对应依据。这样可以确保正文、附录、源码三者之间保持一致。
