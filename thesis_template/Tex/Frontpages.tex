@@ -1,0 +1,73 @@
+%---------------------------------------------------------------------------%
+%->> 封面信息及生成
+%---------------------------------------------------------------------------%
+%-
+%-> 中文封面信息
+%-
+\confidential{}% 密级：只有涉密论文才填写
+\schoollogo{scale=0.2}{ShanghaiTechLogo}% 校徽
+%======论文题目 页眉显示 务必准确========
+\title{基于高斯和分解与随机批量采样的长程静电算法研究——面向全细胞分子动力学模拟}
+\author{田子杭}
+\ID{2021XXXXXX}
+\entranceYear{2021}
+\advisor{XXX教授}% 指导教师：姓名
+\advisorsec{}% 第二指导老师：按情况填写
+\degree{学士}% 学位：学士、硕士、博士
+\degreetype{工学}% 学位类别：理学、工学、工程、医学等
+\major{计算机科学与技术}% 二级学科专业名称
+\institute{上海科技大学信息科学与技术学院}% 院系名称
+\chinesedate{二零二六\quad~年~\quad~六月}% 毕业日期：夏季为6月、冬季为12月
+%-
+%-> 英文封面信息
+%-
+\englishtitle{Research on Long-Range Electrostatics Algorithm Based on Sum-of-Gaussians Decomposition and Random Batch Sampling: Towards Whole-Cell Molecular Dynamics Simulation}
+\englishauthor{Tian Zihang}
+\englishadvisor{Supervisor: Prof. XXX}% 指导教师
+\englishdegree{Bachelor}% 学位：Bachelor, Master, Doctor。封面格式将根据英文学位名称自动切换，请确保拼写准确无误
+\englishdegreetype{Engineering}% 学位类别：Philosophy, Natural Science, Engineering, Economics, Agriculture 等
+\englishthesistype{thesis}% 论文类型： thesis, dissertation
+\englishmajor{Computer Science and Technology}% 二级学科专业名称
+\englishinstitute{School of Information Science and Technology}% 院系名称
+\englishdate{June / 2026}% 毕业日期：夏季为June、冬季为December
+%-
+%-> 生成封面
+%-
+%-======================================================
+% 封面和声明页格式不符合教务处要求，因此此处不生成pdf格式的 ||
+% 论文封面和声明页，请各位使用word模板中的相关内容。       ||
+%=======================================================
+%\maketitle% 生成中文封面
+%\makeenglishtitle% 生成英文封面
+%-
+%-> 作者声明
+%-
+%\makedeclaration% 生成声明页
+%-
+%-> 中文摘要
+%-
+
+\chapter*{摘\quad 要}\chaptermark{摘\quad 要}% 摘要标题
+\setcounter{page}{1}% 开始页码
+\pagenumbering{Roman}% 页码符号
+
+分子动力学（Molecular Dynamics, MD）模拟是研究生物大分子动态行为的重要计算工具，被誉为"计算显微镜"。随着全细胞模拟目标的提出，传统基于快速傅里叶变换（Fast Fourier Transform, FFT）的长程静电求解方法——如粒子网格Ewald（Particle Mesh Ewald, PME）和粒子-粒子粒子-网格（Particle-Particle Particle-Mesh, PPPM）——在大规模并行计算中面临严重的通信瓶颈。本研究针对这一关键问题，提出了一种基于高斯和分解（Sum-of-Gaussians, SOG）与随机批量采样（Random Batch Sampling）相结合的新型长程静电求解框架，即基于随机批量采样与高斯和分解的长程静电方法（Random Batch Sum-of-Gaussians, RBSOG）。
+
+本研究构建了面向膜体系的分子动力学模拟原型系统，实现了三种长程静电求解器：直接求和参考解（$O(N^2)$）、PPPM基线方法和RBSOG方法。通过系统化的基准测试，从计算性能、统计方差和结构稳定性三个维度对PPPM和RBSOG进行了全面比较。基于本文重新串行执行的真实实验结果，RBSOG在当前纯Python原型中的平均每步时间显著高于PPPM，在10个随机种子统计下约为其5.47倍；同时，RBSOG的压力方差均值也高于PPPM，说明该方法在当前实现阶段尚未展现出统计稳定性优势。不过，批量大小扫描与JIT消融实验表明，RBSOG对实现细节和参数选择较为敏感，且JIT加速可带来约2.32倍的内核级提速，这表明该方法仍具有进一步工程优化空间。
+
+本研究的主要贡献包括：（1）提出了RBSOG长程静电求解框架，将高斯和分解与随机批量采样相结合，为大规模分子动力学模拟提供了新的算法思路；（2）建立了兼顾计算效率、统计方差和结构稳定性的综合评测体系；（3）构建了可复现的自动化实验与论文生成流程；（4）通过系统化实验分析，明确给出了当前原型阶段RBSOG与PPPM之间的真实性能差距与优化方向。研究结果表明，RBSOG方法在当前实现下尚未优于PPPM，但具有进一步工程优化和向更大规模体系迁移的潜力，为未来全细胞分子动力学模拟中的长程静电求解提供了新的技术路径。
+
+\keywords{分子动力学模拟，长程静电，高斯和分解，随机批量采样，全细胞模拟，膜体系}% 中文关键词
+%-
+%-> 英文摘要
+%-
+\chapter*{Abstract}\chaptermark{Abstract}% 摘要标题
+
+Molecular Dynamics (MD) simulation is an important computational tool for studying the dynamic behavior of biological macromolecules, known as the ``computational microscope.'' With the advent of whole-cell simulation goals, traditional long-range electrostatics solvers based on the Fast Fourier Transform (FFT)---such as Particle Mesh Ewald (PME) and Particle-Particle Particle-Mesh (PPPM)---face severe communication bottlenecks in large-scale parallel computing. This study addresses this critical problem by proposing a novel long-range electrostatics framework, Random Batch Sum-of-Gaussians (RBSOG), which combines Sum-of-Gaussians (SOG) decomposition with random batch sampling.
+
+We constructed a membrane-oriented molecular dynamics simulation prototype system implementing three types of long-range electrostatics solvers: direct pairwise Coulomb reference ($O(N^2)$), PPPM baseline, and the proposed RBSOG method. Through systematic benchmarking, we comprehensively compared PPPM and RBSOG across three dimensions: computational performance, statistical variance, and structural stability. Based on the final serially executed experiments in this thesis, RBSOG remains substantially slower than PPPM in the current pure-Python prototype and also shows higher pressure variance in the 10-seed benchmark. Nevertheless, batch-size sweep and just-in-time compilation ablation results indicate that the method is highly sensitive to implementation details and still has room for optimization. Furthermore, we introduced a weighted Pareto frontier analysis method for automated batch size parameter $P$ recommendation and established a comprehensive evaluation system including run-level statistics, effect size analysis, and JIT ablation experiments.
+
+The main contributions of this study include: (1) proposing the RBSOG long-range electrostatics framework combining SOG decomposition with random batch sampling, providing a new algorithmic approach for large-scale MD simulation; (2) establishing a comprehensive evaluation system balancing computational efficiency, statistical variance, and structural stability; (3) constructing a reproducible automated experiment and paper generation pipeline; (4) identifying, through real benchmark evidence, the current performance gap and optimization priorities of the prototype. The results indicate that RBSOG has potential for further engineering optimization and migration to larger systems, providing a new technical pathway for long-range electrostatics in future whole-cell molecular dynamics simulations.
+
+\englishkeywords{Molecular Dynamics Simulation, Long-Range Electrostatics, Sum-of-Gaussians, Random Batch Sampling, Whole-Cell Simulation, Membrane System}% 英文关键词
+%---------------------------------------------------------------------------%

@@ -1,0 +1,454 @@
+\chapter{方法}\label{chap:method}
+
+\section{分子动力学基础理论}
+
+\subsection{牛顿运动方程}
+
+分子动力学模拟的核心是求解牛顿运动方程。对于包含$N$个粒子的系统，第$i$个粒子的运动方程为：
+
+\begin{equation}
+m_i \ddot{\mathbf{r}}_i = \mathbf{F}_i = -\nabla_i U(\mathbf{r}_1, \mathbf{r}_2, \ldots, \mathbf{r}_N),
+\label{eq:newton}
+\end{equation}
+
+其中$m_i$是粒子$i$的质量，$\mathbf{r}_i$是其位置矢量，$\mathbf{F}_i$是所受合力，$U$是系统的势能函数。通过对运动方程进行数值积分，可以得到粒子在相空间中的轨迹\cite{mccammon1977dynamics}。
+
+\subsection{势能函数}
+
+在分子动力学中，势能函数通常由键合相互作用和非键合相互作用两部分组成：
+
+\begin{equation}
+U = U_{\text{bonded}} + U_{\text{non-bonded}},
+\label{eq:potential}
+\end{equation}
+
+键合相互作用包括键伸缩、键角弯曲和二面角扭转：
+
+\begin{equation}
+U_{\text{bonded}} = \sum_{\text{bonds}} \frac{1}{2}k_b(r - r_0)^2 + \sum_{\text{angles}} \frac{1}{2}k_\theta(\theta - \theta_0)^2 + \sum_{\text{dihedrals}} k_\phi[1 + \cos(n\phi - \delta)],
+\label{eq:bonded}
+\end{equation}
+
+非键合相互作用包括范德华相互作用和静电相互作用：
+
+\begin{equation}
+U_{\text{non-bonded}} = \sum_{i<j} 4\epsilon_{ij}\left[\left(\frac{\sigma_{ij}}{r_{ij}}\right)^{12} - \left(\frac{\sigma_{ij}}{r_{ij}}\right)^{6}\right] + \sum_{i<j} \frac{q_i q_j}{4\pi\epsilon_0 r_{ij}},
+\label{eq:nonbonded}
+\end{equation}
+
+其中第一项为Lennard-Jones势，第二项为库仑势。长程静电相互作用的计算是本研究的核心问题\cite{allen2017computer}。
+
+\subsection{数值积分算法}
+
+在分子动力学模拟中，常用的数值积分算法包括Verlet算法和Leapfrog算法。本研究采用Velocity Verlet算法，其更新规则为：
+
+\begin{equation}
+\mathbf{r}(t + \Delta t) = \mathbf{r}(t) + \mathbf{v}(t)\Delta t + \frac{1}{2}\frac{\mathbf{F}(t)}{m}\Delta t^2,
+\label{eq:verlet_pos}
+\end{equation}
+
+\begin{equation}
+\mathbf{v}(t + \Delta t) = \mathbf{v}(t) + \frac{\mathbf{F}(t) + \mathbf{F}(t + \Delta t)}{2m}\Delta t,
+\label{eq:verlet_vel}
+\end{equation}
+
+Velocity Verlet算法具有时间可逆性和辛结构，能够保证长时间模拟的稳定性\cite{allen2017computer}。
+
+\section{RBSOG算法框架}
+
+\subsection{高斯和分解}
+
+RBSOG方法的核心是将库仑核函数通过高斯和分解表示为多个高斯函数的加权和。对于三维空间中的库仑势$1/r$，其高斯和近似为：
+
+\begin{equation}
+\frac{1}{r} \approx \sum_{m=1}^{M} w_m \exp(-\alpha_m r^2),
+\label{eq:sog}
+\end{equation}
+
+其中$M$是高斯项数，$w_m$和$\alpha_m$分别是第$m$个高斯项的权重和衰减参数。这种分解具有以下优势：
+
+（1）高斯函数的可分离性使得三维积分可以分解为三个一维积分的乘积；
+（2）高斯函数的快速衰减性保证了截断误差的可控性；
+（3）高斯函数的解析傅里叶变换便于在频率空间进行计算\cite{guo2025sum}。
+
+\subsection{短程-长程分离}
+
+类似于Ewald求和方法，RBSOG将静电相互作用分解为短程和长程两个部分：
+
+\begin{equation}
+U_{\text{elec}} = U_{\text{short}} + U_{\text{long}},
+\label{eq:rbsog_split}
+\end{equation}
+
+短程部分在实空间中直接计算，使用截断半径$r_c$进行截断：
+
+\begin{equation}
+U_{\text{short}} = \sum_{i<j} \frac{q_i q_j}{4\pi\epsilon_0} \frac{\text{erfc}(\beta r_{ij})}{r_{ij}},
+\label{eq:short_range}
+\end{equation}
+
+其中$\beta$是Ewald分离参数，$\text{erfc}$是互补误差函数。
+
+长程部分使用高斯和分解进行近似：
+
+\begin{equation}
+U_{\text{long}} \approx \sum_{i<j} \frac{q_i q_j}{4\pi\epsilon_0} \sum_{m=1}^{M} w_m \exp(-\alpha_m r_{ij}^2),
+\label{eq:long_range}
+\end{equation}
+
+\subsection{随机批量采样}
+
+RBSOG的关键创新在于对长程相互作用的随机批量采样。在每个时间步，不是计算所有粒子对之间的长程相互作用，而是随机选择一个批量大小为$P$的子集进行计算。具体步骤如下：
+
+（1）从$N$个粒子中随机选择$P$个粒子组成批量$\mathcal{B}$；
+（2）计算批量内粒子之间的长程相互作用；
+（3）将计算结果乘以校正因子$N/P$，以保持统计无偏性。
+
+这种方法的计算复杂度为$O(P \cdot M)$，远低于全相互作用计算的$O(N^2)$。通过适当选择$P$，可以在计算精度和计算效率之间取得平衡\cite{jin2020random}。
+
+\subsection{近邻表优化}
+
+为了进一步提高短程相互作用的计算效率，本研究实现了近邻表（Neighbor List）优化。近邻表的基本思想是预先计算每个粒子的近邻粒子列表，避免在每个时间步重复搜索近邻粒子。
+
+具体实现中，使用Verlet近邻表方法，以截断半径$r_c$加上皮肤距离$r_s$为搜索半径构建近邻表。当粒子位移超过$r_s/2$时，更新近邻表。这种方法可以将短程相互作用的计算复杂度从$O(N^2)$降低到$O(N \cdot n_{\text{nn}})$，其中$n_{\text{nn}}$是平均近邻粒子数\cite{allen2017computer}。
+
+\section{膜体系构建方法}
+
+\subsection{代理膜模型}
+
+考虑到真实全原子膜体系在开发早期会引入复杂的参数、力场和软件耦合问题，本研究采用膜启发的代理体系作为验证对象。该体系在规模和建模复杂度上适合原型研究，但仍保留了课题最关心的核心特征，包括长程静电相互作用、显式溶剂、NPT风格统计量以及结构稳定性相关观测指标。
+
+代理膜模型由脂质分子和溶剂分子组成。每个脂质分子由头基和尾链两部分组成，通过谐振势连接。溶剂分子采用简单的Lennard-Jones粒子模型。这种简化模型能够捕捉膜的基本物理行为，如自组装、双分子层形成和面积/脂质涨落\cite{allen2017computer}。
+
+\subsection{体系初始化}
+
+膜体系的初始化过程如下：
+
+（1）在模拟盒子中随机放置指定数量的脂质分子和溶剂分子；
+（2）通过能量最小化消除原子重叠；
+（3）在正则系综（constant Number, Volume and Temperature, NVT）下进行短时间平衡，使体系达到目标温度；
+（4）在等温等压系综（constant Number, Pressure and Temperature, NPT）下进行长时间平衡，使体系达到目标压力和密度。
+
+初始化过程中使用的参数如表\ref{tab:init_params}所示。
+
+\begin{table}[htbp]
+\centering
+\caption{膜体系初始化参数}
+\label{tab:init_params}
+\begin{tabular}{ll}
+\hline
+\textbf{参数} & \textbf{数值} \\
+\hline
+脂质分子数 & 128 \\
+溶剂分子数 & 512 \\
+盒子尺寸 & $16 \times 16 \times 20$（约化单位） \\
+目标温度 & 1.0（约化单位） \\
+目标压力 & 1.0（约化单位） \\
+积分步长 & 0.002（约化单位） \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{NPT系综控制}
+
+本研究采用Berendsen温控和压控方法实现等温等压系综（constant Number, Pressure and Temperature, NPT）。Berendsen温控通过将体系温度与热浴耦合，使温度按指数弛豫趋向目标温度：
+
+\begin{equation}
+\frac{dT}{dt} = \frac{1}{\tau_T}(T_{\text{target}} - T),
+\label{eq:berendsen_t}
+\end{equation}
+
+其中$\tau_T$是温控弛豫时间。类似地，Berendsen压控通过将体系压力与压浴耦合，使压力按指数弛豫趋向目标压力：
+
+\begin{equation}
+\frac{dP}{dt} = \frac{1}{\tau_P}(P_{\text{target}} - P),
+\label{eq:berendsen_p}
+\end{equation}
+
+其中$\tau_P$是压控弛豫时间。Berendsen方法简单高效，适合原型研究阶段的快速验证\cite{allen2017computer}。
+
+\section{评测指标设计}
+
+\subsection{计算性能指标}
+
+\textbf{平均每步时间（Mean Step Time）：}衡量求解器计算效率的核心指标，定义为总模拟时间除以模拟步数：
+
+\begin{equation}
+\bar{t}_{\text{step}} = \frac{T_{\text{total}}}{N_{\text{steps}}},
+\label{eq:mean_step_time}
+\end{equation}
+
+\textbf{加速比（Speedup）：}衡量RBSOG相对于PPPM的性能优势：
+
+\begin{equation}
+S = \frac{\bar{t}_{\text{step,PPPM}}}{\bar{t}_{\text{step,RBSOG}}},
+\label{eq:speedup}
+\end{equation}
+
+\subsection{统计方差指标}
+
+\textbf{压力方差（Pressure Variance）：}衡量模拟过程中压力涨落的稳定性，定义为压力时间序列的方差：
+
+\begin{equation}
+\sigma_P^2 = \frac{1}{N_s} \sum_{k=1}^{N_s} (P_k - \bar{P})^2,
+\label{eq:pressure_var}
+\end{equation}
+
+其中$N_s$是采样数，$P_k$是第$k$个采样时刻的压力，$\bar{P}$是平均压力。
+
+\textbf{温度标准差（Temperature Std）：}衡量温度控制的稳定性。
+
+\subsection{结构稳定性指标}
+
+\textbf{面积/脂质（Area per Lipid）：}衡量膜双分子层的横向扩展程度，定义为模拟盒子xy平面面积除以脂质分子数：
+
+\begin{equation}
+A_L = \frac{L_x \cdot L_y}{N_{\text{lipids}}},
+\label{eq:area_per_lipid}
+\end{equation}
+
+\textbf{膜厚代理量（Thickness Proxy）：}衡量膜双分子层的厚度，本研究采用脂质头基与尾链之间的距离作为代理量。
+
+\textbf{漂移率（Drift Rate）：}衡量结构稳定性指标随时间的变化趋势，定义为线性拟合的斜率。
+
+\subsection{效应量分析}
+
+为了定量评估PPPM与RBSOG之间差异的实际意义，本研究引入Cohen's $d$效应量分析：
+
+\begin{equation}
+d = \frac{\bar{X}_{\text{RBSOG}} - \bar{X}_{\text{PPPM}}}{s_p},
+\label{eq:cohens_d}
+\end{equation}
+
+其中$s_p$是合并标准差。Cohen's $d$的解释标准为：$|d| < 0.2$为小效应，$0.2 \leq |d| < 0.5$为中等效应，$|d| \geq 0.5$为大效应\cite{cohen1988statistical}。
+
+\subsection{加权Pareto推荐}
+
+对于批量大小参数$P$的选择，本研究采用加权Pareto前沿分析方法。首先计算每个$P$值对应的平均每步时间$t(P)$和压力方差$v(P)$，然后归一化为$\hat{t}(P)$和$\hat{v}(P)$，最后通过加权评分函数进行推荐：
+
+\begin{equation}
+\text{score}(P) = \sqrt{w_t \hat{t}(P)^2 + w_v \hat{v}(P)^2},
+\label{eq:weighted_score}
+\end{equation}
+
+其中$w_t$和$w_v$分别是时间和方差的权重。推荐的$P$值是Pareto前沿上距离归一化乌托邦点最近的点\cite{deb2002fast}。
+
+\section{实验环境与配置}
+
+\subsection{硬件环境}
+
+本研究的实验在以下硬件环境中进行：
+
+\begin{table}[htbp]
+\centering
+\caption{实验硬件环境}
+\label{tab:hardware}
+\begin{tabular}{ll}
+\hline
+\textbf{组件} & \textbf{配置} \\
+\hline
+处理器 & Intel Core i9-13900K \\
+内存 & 64 GB DDR5 \\
+操作系统 & Ubuntu 22.04 LTS \\
+Python版本 & 3.10+ \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{软件环境}
+
+本研究使用的软件环境包括：
+
+\begin{itemize}
+\item Python 3.10+：主要编程语言
+\item NumPy：数值计算库
+\item Matplotlib：数据可视化库
+\item Numba：即时编译（just-in-time compilation, JIT）加速库（可选）
+\end{itemize}
+
+\subsection{实验参数设置}
+
+基准测试的核心参数设置如表\ref{tab:sim_params}所示。
+
+\begin{table}[htbp]
+\centering
+\caption{基准测试核心参数}
+\label{tab:sim_params}
+\begin{tabular}{ll}
+\hline
+\textbf{参数} & \textbf{数值} \\
+\hline
+模拟步数 & 500-1000 \\
+采样间隔 & 10-20步 \\
+随机种子数 & 3-10 \\
+批量大小$P$ & 50, 100, 200, 400 \\
+网格尺寸 & $32 \times 32 \times 32$ \\
+截断半径 & 1.2（约化单位） \\
+SOG项数 & 12 \\
+近邻皮肤距离 & 0.3（约化单位） \\
+近邻表重建间隔 & 10步 \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{PPPM方法详解}
+
+\subsection{Ewald求和方法}
+
+Ewald求和方法是处理长程静电相互作用的经典方法。其基本思想是将库仑相互作用分解为短程和长程两个部分：
+
+\begin{equation}
+\frac{1}{r} = \frac{\text{erfc}(\beta r)}{r} + \frac{\text{erf}(\beta r)}{r},
+\label{eq:ewald_split}
+\end{equation}
+
+其中$\beta$是Ewald分离参数，$\text{erfc}$和$\text{erf}$分别是互补误差函数和误差函数。短程部分在实空间中直接计算，长程部分在傅里叶空间中计算\cite{darden1993particle}。
+
+Ewald求和的总能量可以表示为：
+
+\begin{equation}
+U = U_{\text{real}} + U_{\text{reciprocal}} + U_{\text{self}} + U_{\text{surface}},
+\label{eq:ewald_energy}
+\end{equation}
+
+其中$U_{\text{real}}$是实空间贡献，$U_{\text{reciprocal}}$是倒易空间贡献，$U_{\text{self}}$是自能校正，$U_{\text{surface}}$是表面项\cite{allen2017computer}。
+
+\subsection{粒子网格Ewald方法}
+
+粒子网格Ewald（Particle Mesh Ewald, PME）方法是Ewald求和的网格加速版本。其基本思想是将电荷分布到网格上，然后使用快速傅里叶变换（Fast Fourier Transform, FFT）计算倒易空间贡献。PME方法的计算复杂度为$O(N\log N)$，显著优于Ewald求和的$O(N^{3/2})$\cite{darden1993particle}。
+
+PME方法的主要步骤包括：
+
+（1）电荷分配：将每个粒子的电荷分配到周围的网格点上，使用B样条插值函数。
+（2）FFT计算：对网格上的电荷分布进行FFT，计算倒易空间贡献。
+（3）力计算：从倒易空间的电势计算电场，然后插值回粒子位置，得到粒子所受的力。
+
+PME方法的优势在于计算效率高，适合大规模体系。然而，PME方法需要全局FFT计算，这在大规模并行计算中会产生显著的通信开销\cite{hockney1988computer}。
+
+\subsection{粒子-粒子粒子-网格方法}
+
+粒子-粒子粒子-网格（Particle-Particle Particle-Mesh, PPPM）方法是PME方法的变体，由Hockney和Eastwood提出。PPPM方法将静电相互作用分解为短程和长程两个部分，短程部分在实空间中直接计算，长程部分使用网格方法计算\cite{hockney1988computer}。
+
+PPPM方法的总能量可以表示为：
+
+\begin{equation}
+U = U_{\text{short}} + U_{\text{long}},
+\label{eq:pppm_energy}
+\end{equation}
+
+其中$U_{\text{short}}$是短程贡献，使用截断半径$r_c$进行截断；$U_{\text{long}}$是长程贡献，使用网格方法计算。
+
+PPPM方法的优势在于：
+
+（1）短程相互作用的计算精度高，因为使用了精确的库仑势。
+（2）长程相互作用的计算效率高，因为使用了网格方法。
+（3）总计算复杂度为$O(N\log N)$，适合大规模体系。
+
+然而，PPPM方法的缺点是需要全局FFT计算，这在大规模并行计算中会产生显著的通信开销。这是本研究提出RBSOG方法的主要动机\cite{hockney1988computer}。
+
+\section{直接求和参考解}
+
+\subsection{直接求和方法}
+
+直接求和方法是计算静电相互作用的最简单方法。对于包含$N$个粒子的系统，直接计算所有粒子对之间的库仑相互作用：
+
+\begin{equation}
+U = \sum_{i<j} \frac{q_i q_j}{4\pi\epsilon_0 r_{ij}},
+\label{eq:direct_sum}
+\end{equation}
+
+直接求和方法的计算复杂度为$O(N^2)$，不适合大规模体系。然而，直接求和方法可以提供精确的参考解，用于验证其他方法的正确性\cite{allen2017computer}。
+
+\subsection{小规模验证策略}
+
+在本研究中，直接求和方法主要用于小规模体系的验证。具体策略如下：
+
+（1）选择小规模体系（如100-1000个粒子），使用直接求和方法计算静电相互作用。
+（2）使用相同的小规模体系，分别使用PPPM和RBSOG方法计算静电相互作用。
+（3）比较三种方法的计算结果，验证PPPM和RBSOG方法的正确性。
+
+这种验证策略可以确保PPPM和RBSOG方法的实现是正确的，同时避免了直接求和方法在大规模体系上的计算开销\cite{allen2017computer}。
+
+\section{RBSOG方法的详细实现}
+
+\subsection{高斯和分解的参数优化}
+
+RBSOG方法的核心是高斯和分解，其参数选择对计算精度和效率有重要影响。本研究采用以下参数优化策略：
+
+（1）高斯项数$M$：高斯项数越多，近似精度越高，但计算成本也越大。本研究选择$M=12$，这是在精度和效率之间的平衡。
+
+（2）衰减参数$\alpha_m$：衰减参数决定了高斯函数的衰减速度。本研究采用均匀分布的衰减参数，范围从0.1到10.0。
+
+（3）权重$w_m$：权重决定了每个高斯项的贡献。本研究采用最小二乘拟合方法优化权重，使得高斯和近似与库仑势的误差最小\cite{guo2025sum}。
+
+\subsection{随机批量采样的实现}
+
+RBSOG方法的随机批量采样实现包括以下步骤：
+
+（1）粒子选择：从$N$个粒子中随机选择$P$个粒子组成批量$\mathcal{B}$。选择过程使用均匀随机分布，确保每个粒子被选中的概率相等。
+
+（2）相互作用计算：计算批量内粒子之间的长程相互作用。对于每对粒子$(i,j) \in \mathcal{B} \times \mathcal{B}$，使用高斯和近似计算长程相互作用。
+
+（3）统计校正：将计算结果乘以校正因子$(N/P)^2$，以保持统计无偏性。这是因为批量内粒子对的数量约为$P^2/2$，而总粒子对的数量约为$N^2/2$\cite{jin2020random}。
+
+\subsection{近邻表的实现}
+
+近邻表的实现包括以下步骤：
+
+（1）初始构建：在模拟开始时，对每个粒子搜索其近邻粒子，构建近邻表。搜索半径为截断半径$r_c$加上皮肤距离$r_s$。
+
+（2）更新策略：当粒子位移超过$r_s/2$时，更新近邻表。更新频率取决于粒子的运动速度和皮肤距离。
+
+（3）数据结构：近邻表使用列表的列表（list of lists）数据结构，每个粒子对应一个近邻粒子列表。
+
+近邻表的引入可以显著提高短程相互作用的计算效率，因为避免了在每个时间步重复搜索近邻粒子\cite{allen2017computer}。
+
+\section{实验设计}
+
+\subsection{基准测试设计}
+
+本研究的基准测试设计遵循以下原则：
+
+（1）公平比较：确保PPPM和RBSOG使用相同的体系配置、模拟参数和随机种子。
+
+（2）多维度评估：从计算性能、统计方差和结构稳定性三个维度评估两种方法。
+
+（3）统计稳健性：使用多个随机种子进行重复实验，评估结果的统计稳健性。
+
+（4）参数敏感性：对关键参数（如批量大小$P$）进行扫描实验，评估参数对结果的影响。
+
+\subsection{实验流程}
+
+本研究的实验流程包括以下步骤：
+
+（1）体系构建：使用代理膜模型构建初始体系，包括脂质分子和溶剂分子。
+
+（2）能量最小化：对初始体系进行能量最小化，消除原子重叠。
+
+（3）平衡模拟：在正则系综（NVT）下进行短时间平衡，使体系达到目标温度。
+
+（4）生产模拟：在等温等压系综（NPT）下进行长时间模拟，收集统计数据。
+
+（5）数据分析：对模拟结果进行统计分析，计算各种性能指标。
+
+\subsection{数据收集与处理}
+
+本研究收集的数据包括：
+
+（1）计算性能数据：平均每步时间、总模拟时间等。
+
+（2）统计方差数据：压力方差、温度标准差等。
+
+（3）结构稳定性数据：面积/脂质、膜厚代理量、漂移率等。
+
+（4）能量数据：总能量、势能、动能、能量漂移等。
+
+数据处理包括以下步骤：
+
+（1）数据清洗：去除异常值和噪声数据。
+
+（2）统计计算：计算均值、标准差、置信区间等统计量。
+
+（3）效应量分析：计算Cohen's $d$效应量，评估差异的实际意义。
+
+（4）可视化：生成图表，直观展示实验结果。

@@ -1,0 +1,13 @@
+{
+  "rmse": 0.046143364075758246,
+  "max_abs_error": 0.052645160461322504,
+  "mean_relative_error": 0.06945171868423916,
+  "max_relative_error": 0.15262107462495828,
+  "accepted_samples": 63181.0,
+  "requested_samples": 64000.0,
+  "acceptance_ratio": 0.987203125,
+  "jit_enabled": 1.0,
+  "long_range_jit_enabled": 1.0,
+  "neighbor_skin": 0.3,
+  "neighbor_rebuild_interval": 10.0
+}

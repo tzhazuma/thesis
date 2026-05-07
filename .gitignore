@@ -6,3 +6,20 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ipynb_checkpoints/
+
+# Thesis build artifacts
+thesis_template/Thesis.aux
+thesis_template/Thesis.bbl
+thesis_template/Thesis.blg
+thesis_template/Thesis.lof
+thesis_template/Thesis.log
+thesis_template/Thesis.lot
+thesis_template/Thesis.out
+thesis_template/Thesis.toc
+thesis_template/Style/texput.log
+
+# Superseded thesis experiment outputs kept locally only
+results/thesis_batch_sweep/
+results/thesis_benchmark_main/
+results/thesis_run_rbsog/
+results/thesis_final_run_rbsog/

@@ -1,0 +1,25 @@
+{
+  "benchmark_summary": "results/thesis_benchmark_10seeds/benchmark_summary.csv",
+  "benchmark_runs": "results/thesis_benchmark_10seeds/benchmark_runs.csv",
+  "sweep_summary": "results/thesis_final_batch_sweep/batch_sweep_summary.json",
+  "stability_summary": "results/thesis_final_run_with_config/stability_summary.json",
+  "run_config": "results/thesis_final_run_with_config/run_config.json",
+  "paper_table_csv": "results/thesis_final_batch_sweep/batch_sweep_paper_table.csv",
+  "jit_on_summary": "results/thesis_ablation_jit_on/benchmark_summary.csv",
+  "jit_off_summary": "results/thesis_ablation_jit_off/benchmark_summary.csv",
+  "generated_files": [
+    "benchmark_table.tex",
+    "benchmark_stats_table.tex",
+    "effect_size_table.tex",
+    "sweep_table.tex",
+    "config_table.tex",
+    "jit_ablation_table.tex",
+    "macros.tex",
+    "solver_compare.png",
+    "seed_scatter.png",
+    "sweep_pareto.png",
+    "sweep_sensitivity.png",
+    "stability_timeseries.png",
+    "jit_ablation.png"
+  ]
+}

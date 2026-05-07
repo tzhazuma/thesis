@@ -1,0 +1,335 @@
+\chapter{代码实现}\label{appendix:code}
+
+\section{RBSOG求解器核心代码}
+
+以下是RBSOG求解器的核心实现代码：
+
+\begin{lstlisting}[language=Python, caption=RBSOG求解器核心代码]
+import numpy as np
+from typing import Tuple, List
+
+class RBSOGSolver:
+    """RBSOG long-range electrostatics solver."""
+    
+    def __init__(self, 
+                 grid_shape: Tuple[int, int, int],
+                 batch_size: int,
+                 cutoff_short: float,
+                 sog_terms: int,
+                 neighbor_skin: float,
+                 neighbor_rebuild_interval: int,
+                 use_numba: bool = True):
+        """Initialize RBSOG solver.
+        
+        Args:
+            grid_shape: Grid dimensions for PPPM-like baseline
+            batch_size: Number of particles in random batch
+            cutoff_short: Short-range cutoff distance
+            sog_terms: Number of SOG terms
+            neighbor_skin: Skin distance for neighbor list
+            neighbor_rebuild_interval: Steps between neighbor list rebuilds
+            use_numba: Whether to use numba JIT acceleration
+        """
+        self.grid_shape = grid_shape
+        self.batch_size = batch_size
+        self.cutoff_short = cutoff_short
+        self.sog_terms = sog_terms
+        self.neighbor_skin = neighbor_skin
+        self.neighbor_rebuild_interval = neighbor_rebuild_interval
+        self.use_numba = use_numba
+        
+        # Initialize SOG parameters
+        self._init_sog_parameters()
+        
+        # Initialize neighbor list
+        self._init_neighbor_list()
+    
+    def _init_sog_parameters(self):
+        """Initialize SOG decomposition parameters."""
+        # Uniform distribution of decay parameters
+        self.alpha = np.linspace(0.1, 10.0, self.sog_terms)
+        
+        # Optimize weights using least squares fitting
+        self.weights = self._optimize_weights()
+    
+    def _optimize_weights(self):
+        """Optimize SOG weights using least squares fitting."""
+        # Build matrix for least squares
+        r = np.linspace(0.1, 10.0, 1000)
+        A = np.exp(-np.outer(r**2, self.alpha))
+        b = 1.0 / r
+        
+        # Solve least squares problem
+        weights, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
+        return weights
+    
+    def _init_neighbor_list(self):
+        """Initialize neighbor list."""
+        self.neighbor_list = []
+        self.last_positions = None
+    
+    def compute_forces(self, 
+                      positions: np.ndarray, 
+                      charges: np.ndarray,
+                      box: np.ndarray) -> np.ndarray:
+        """Compute forces on all particles.
+        
+        Args:
+            positions: Particle positions (N x 3)
+            charges: Particle charges (N,)
+            box: Box dimensions (3,)
+            
+        Returns:
+            forces: Forces on all particles (N x 3)
+        """
+        N = len(positions)
+        forces = np.zeros_like(positions)
+        
+        # Update neighbor list if needed
+        if self._need_neighbor_list_update(positions):
+            self._update_neighbor_list(positions, box)
+        
+        # Compute short-range forces
+        forces += self._compute_short_range(positions, charges, box)
+        
+        # Compute long-range forces using random batch sampling
+        forces += self._compute_long_range(positions, charges, box)
+        
+        return forces
+    
+    def _need_neighbor_list_update(self, positions: np.ndarray) -> bool:
+        """Check if neighbor list needs update."""
+        if self.last_positions is None:
+            return True
+        
+        # Check if any particle has moved more than skin/2
+        displacement = np.max(np.linalg.norm(
+            positions - self.last_positions, axis=1))
+        return displacement > self.neighbor_skin / 2
+    
+    def _update_neighbor_list(self, positions: np.ndarray, box: np.ndarray):
+        """Update neighbor list."""
+        N = len(positions)
+        self.neighbor_list = []
+        
+        for i in range(N):
+            neighbors = []
+            for j in range(i + 1, N):
+                # Compute distance with periodic boundary conditions
+                dr = positions[i] - positions[j]
+                dr -= box * np.round(dr / box)
+                r = np.linalg.norm(dr)
+                
+                if r < self.cutoff_short + self.neighbor_skin:
+                    neighbors.append(j)
+            
+            self.neighbor_list.append(neighbors)
+        
+        self.last_positions = positions.copy()
+    
+    def _compute_short_range(self, 
+                            positions: np.ndarray, 
+                            charges: np.ndarray,
+                            box: np.ndarray) -> np.ndarray:
+        """Compute short-range forces."""
+        N = len(positions)
+        forces = np.zeros_like(positions)
+        
+        for i in range(N):
+            for j in self.neighbor_list[i]:
+                # Compute distance with periodic boundary conditions
+                dr = positions[i] - positions[j]
+                dr -= box * np.round(dr / box)
+                r = np.linalg.norm(dr)
+                
+                if r < self.cutoff_short:
+                    # Compute short-range force
+                    f = charges[i] * charges[j] / r**2
+                    f *= np.erfc(self.alpha[0] * r)
+                    forces[i] += f * dr / r
+                    forces[j] -= f * dr / r
+        
+        return forces
+    
+    def _compute_long_range(self, 
+                           positions: np.ndarray, 
+                           charges: np.ndarray,
+                           box: np.ndarray) -> np.ndarray:
+        """Compute long-range forces using random batch sampling."""
+        N = len(positions)
+        forces = np.zeros_like(positions)
+        
+        # Random batch sampling
+        batch_indices = np.random.choice(N, 
+                                        size=min(self.batch_size, N), 
+                                        replace=False)
+        
+        # Compute long-range forces within batch
+        for i in batch_indices:
+            for j in batch_indices:
+                if i < j:
+                    # Compute distance with periodic boundary conditions
+                    dr = positions[i] - positions[j]
+                    dr -= box * np.round(dr / box)
+                    r = np.linalg.norm(dr)
+                    
+                    # Compute long-range force using SOG
+                    f = 0.0
+                    for m in range(self.sog_terms):
+                        f += self.weights[m] * np.exp(-self.alpha[m] * r**2)
+                    
+                    f *= charges[i] * charges[j]
+                    forces[i] += f * dr / r
+                    forces[j] -= f * dr / r
+        
+        # Scale forces for statistical unbiasedness
+        scale = (N / self.batch_size)**2
+        forces *= scale
+        
+        return forces
+\end{lstlisting}
+
+\section{基准测试脚本}
+
+以下是基准测试的脚本代码：
+
+\begin{lstlisting}[language=Python, caption=基准测试脚本]
+import argparse
+import json
+from pathlib import Path
+import numpy as np
+from rbsog_md.benchmark import run_benchmark
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Run PPPM vs RBSOG benchmark')
+    parser.add_argument('--solvers', default='pppm,rbsog',
+                       help='Comma-separated solver list')
+    parser.add_argument('--steps', type=int, default=1000,
+                       help='Number of simulation steps')
+    parser.add_argument('--seeds', type=int, default=3,
+                       help='Number of random seeds')
+    parser.add_argument('--batch-size', type=int, default=100,
+                       help='RBSOG batch size')
+    parser.add_argument('--out', type=Path, default=Path('results/benchmark'),
+                       help='Output directory')
+    
+    args = parser.parse_args()
+    
+    # Create output directory
+    args.out.mkdir(parents=True, exist_ok=True)
+    
+    # Run benchmark
+    result = run_benchmark(
+        out_dir=args.out,
+        solver_names=args.solvers.split(','),
+        seeds=list(range(42, 42 + args.seeds)),
+        steps=args.steps,
+        batch_size=args.batch_size,
+    )
+    
+    # Print summary
+    print('Benchmark finished')
+    for row in result['summary']['by_solver']:
+        print(f"{row['solver']}: "
+              f"mean_step_time={row['mean_step_time']:.6f} s, "
+              f"pressure_variance={row['pressure_variance']:.6f}")
+
+if __name__ == '__main__':
+    main()
+\end{lstlisting}
+
+\section{数据分析脚本}
+
+以下是数据分析的脚本代码：
+
+\begin{lstlisting}[language=Python, caption=数据分析脚本]
+import json
+from pathlib import Path
+import numpy as np
+import matplotlib.pyplot as plt
+
+def load_benchmark_data(results_dir: Path):
+    """Load benchmark data from results directory."""
+    data = {}
+    
+    for solver_dir in results_dir.iterdir():
+        if solver_dir.is_dir() and solver_dir.name in ['pppm', 'rbsog']:
+            solver = solver_dir.name
+            data[solver] = []
+            
+            for seed_dir in solver_dir.iterdir():
+                if seed_dir.is_dir():
+                    summary_file = seed_dir / 'summary.json'
+                    if summary_file.exists():
+                        with open(summary_file) as f:
+                            summary = json.load(f)
+                            data[solver].append(summary)
+    
+    return data
+
+def compute_statistics(data):
+    """Compute statistics for each solver."""
+    stats = {}
+    
+    for solver, runs in data.items():
+        step_times = [r['mean_step_time'] for r in runs]
+        pressure_vars = [r['pressure_variance'] for r in runs]
+        
+        stats[solver] = {
+            'mean_step_time': np.mean(step_times),
+            'std_step_time': np.std(step_times),
+            'mean_pressure_variance': np.mean(pressure_vars),
+            'std_pressure_variance': np.std(pressure_vars),
+        }
+    
+    return stats
+
+def plot_comparison(stats, output_dir: Path):
+    """Plot comparison between solvers."""
+    solvers = list(stats.keys())
+    step_times = [stats[s]['mean_step_time'] for s in solvers]
+    pressure_vars = [stats[s]['mean_pressure_variance'] for s in solvers]
+    
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+    
+    # Plot step times
+    ax1.bar(solvers, step_times)
+    ax1.set_ylabel('Mean Step Time (s)')
+    ax1.set_title('Computational Performance')
+    
+    # Plot pressure variances
+    ax2.bar(solvers, pressure_vars)
+    ax2.set_ylabel('Pressure Variance')
+    ax2.set_title('Statistical Stability')
+    
+    plt.tight_layout()
+    plt.savefig(output_dir / 'solver_comparison.png', dpi=300)
+    plt.close()
+
+def main():
+    results_dir = Path('results/benchmark_main')
+    output_dir = Path('analysis')
+    output_dir.mkdir(exist_ok=True)
+    
+    # Load data
+    data = load_benchmark_data(results_dir)
+    
+    # Compute statistics
+    stats = compute_statistics(data)
+    
+    # Print statistics
+    for solver, s in stats.items():
+        print(f'{solver}:')
+        print(f'  Mean step time: {s["mean_step_time"]:.6f} '
+              f'(+/- {s["std_step_time"]:.6f})')
+        print(f'  Mean pressure variance: {s["mean_pressure_variance"]:.6f} '
+              f'(+/- {s["std_pressure_variance"]:.6f})')
+    
+    # Plot comparison
+    plot_comparison(stats, output_dir)
+    print(f'Plot saved to {output_dir / "solver_comparison.png"}')
+
+if __name__ == '__main__':
+    main()
+\end{lstlisting}
