@@ -1,0 +1,29 @@
+{
+  "n_total_runs": 6.0,
+  "by_solver": [
+    {
+      "solver": "pppm",
+      "n_runs": 3.0,
+      "mean_step_time": 0.0007739156983930909,
+      "pressure_variance": 1.2844320867724134e-05,
+      "temperature_mean": 1.0116552909303198,
+      "energy_drift_per_time": -182.12669295353496,
+      "area_per_lipid_std": 0.0013712144636134512,
+      "thickness_proxy_std": 0.1288618298685683,
+      "area_per_lipid_drift_per_time": -0.005664875693619748,
+      "thickness_proxy_drift_per_time": -0.5048915799154523
+    },
+    {
+      "solver": "rbsog",
+      "n_runs": 3.0,
+      "mean_step_time": 0.048771076079598664,
+      "pressure_variance": 6.663118876476056e-05,
+      "temperature_mean": 1.068891494309076,
+      "energy_drift_per_time": 861.1554144976303,
+      "area_per_lipid_std": 0.001283508503688865,
+      "thickness_proxy_std": 0.46210769541777547,
+      "area_per_lipid_drift_per_time": -0.005302490867482826,
+      "thickness_proxy_drift_per_time": 1.8571929728427718
+    }
+  ]
+}

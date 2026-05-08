@@ -1,0 +1,6 @@
+{
+  "summary_csv": "long_stability_summary.csv",
+  "rolling_area_plot": "rolling_area.png",
+  "rolling_thickness_plot": "rolling_thickness.png",
+  "rolling_pressure_plot": "rolling_pressure.png"
+}

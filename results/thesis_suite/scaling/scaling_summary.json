@@ -1,0 +1,6 @@
+{
+  "summary_csv": "scaling_summary.csv",
+  "fit_table_csv": "scaling_exponent_table.csv",
+  "step_time_plot": "scaling_step_time.png",
+  "slowdown_plot": "scaling_slowdown_ratio.png"
+}

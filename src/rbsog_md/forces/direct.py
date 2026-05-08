@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 import numpy as np
 
 from rbsog_md.forces.base import ForceResult
@@ -10,9 +12,10 @@ from rbsog_md.utils import minimum_image
 class DirectCoulombSolver:
     name = "direct"
 
-    def __init__(self, cutoff: float | None = None, softening: float = 1e-12) -> None:
+    def __init__(self, cutoff: float | None = None, softening: float = 1e-12, profile: bool = False) -> None:
         self.cutoff = cutoff
         self.softening = softening
+        self.profile = bool(profile)
 
     def compute(
         self,
@@ -20,6 +23,7 @@ class DirectCoulombSolver:
         rng: np.random.Generator | None = None,
     ) -> ForceResult:
         del rng
+        t0 = time.perf_counter() if self.profile else 0.0
         positions = system.positions
         charges = system.charges
         box = system.box
@@ -28,6 +32,7 @@ class DirectCoulombSolver:
         forces = np.zeros_like(positions)
         potential = 0.0
         virial = 0.0
+        evaluated_pairs = 0
 
         cutoff_sq = None if self.cutoff is None else self.cutoff * self.cutoff
         softening_sq = self.softening * self.softening
@@ -55,5 +60,13 @@ class DirectCoulombSolver:
 
             potential += float(np.sum(qij * inv_r))
             virial += float(np.sum(np.einsum("ij,ij->i", disp_valid, pair_force)))
+            evaluated_pairs += int(r_sq_valid.size)
 
-        return ForceResult(forces=forces, potential=potential, virial=virial)
+        diagnostics = None
+        if self.profile:
+            diagnostics = {
+                "direct_total_time": float(time.perf_counter() - t0),
+                "direct_pair_count": float(evaluated_pairs),
+            }
+
+        return ForceResult(forces=forces, potential=potential, virial=virial, diagnostics=diagnostics)

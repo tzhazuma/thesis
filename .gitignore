@@ -17,6 +17,19 @@ thesis_template/Thesis.lot
 thesis_template/Thesis.out
 thesis_template/Thesis.toc
 thesis_template/Style/texput.log
+thesis_template/Tex/Frontpages.private.tex
+thesis_template/Tex/PrivateBuildConfig.tex
+thesis_template/Tmp/
+
+# Report build artifacts
+docs/report/build_report_run.log
+docs/report/main.aux
+docs/report/main.fdb_latexmk
+docs/report/main.fls
+docs/report/main.log
+docs/report/main.out
+docs/report/main.pdf
+docs/report/main.synctex.gz
 
 # Superseded thesis experiment outputs kept locally only
 results/thesis_batch_sweep/

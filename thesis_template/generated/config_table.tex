@@ -2,13 +2,15 @@
 \toprule
 Parameter & Value \\
 \midrule
-System size & lipids=128, solvent=512 \\
-Box (reduced) & (16.00, 16.00, 20.00) \\
-Integrator & steps=1000, dt=0.0020, sample=20 \\
-Target ensemble & T=1.000, P=1.000 \\
-RBSOG kernel & P=100, cutoff=1.200, terms=12 \\
-Neighbor list & skin=0.300, rebuild=10 \\
-Mesh baseline & grid=(32, 32, 32) \\
-JIT status & enabled \\
+Primary system & lipids=128, solvent=512 \\
+Simulation box & $(16, 16, 20)$ reduced units \\
+Main benchmark & 1000 steps, sample interval 20, 10 seeds \\
+PPPM grid fairness choice & $16^3$ \\
+Recommended RBSOG batch & $P=100$ \\
+Short-range cutoff & 1.2 reduced units \\
+Default SOG terms & $M=12$ \\
+Neighbor list & skin=0.3, rebuild interval=10 \\
+Long stability study & 5000 steps, sample interval 50, 5 seeds \\
+Scaling study & $N=320,640,960,1280$ with 3 seeds each \\
 \bottomrule
 \end{tabular}

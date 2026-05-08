@@ -5,7 +5,7 @@ This protocol is designed for a personal workstation (including Apple Silicon) t
 ## 1. Environment setup
 
 ```bash
-cd /Users/azuma/Downloads/thesis
+# From the repository root
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -e .
@@ -116,7 +116,7 @@ Use larger `objective_time_weight` to prefer faster runs, or larger `objective_v
 ## 7. Build LaTeX report
 
 ```bash
-cd /Users/azuma/Downloads/thesis
+# From the repository root
 bash docs/report/build_report.sh
 ```
 

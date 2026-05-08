@@ -124,24 +124,26 @@ def run_simulation(
         elapsed = time.perf_counter() - t0
 
         if step == 1 or step == config.steps or step % config.sample_interval == 0:
-            records.append(
-                {
-                    "step": float(step),
-                    "time": float(step * config.dt),
-                    "step_time": float(elapsed),
-                    "temperature": float(temperature),
-                    "pressure": float(pressure),
-                    "kinetic": float(kinetic),
-                    "potential": float(force_result.potential),
-                    "total_energy": float(total_energy),
-                    "box_x": float(system.box[0]),
-                    "box_y": float(system.box[1]),
-                    "box_z": float(system.box[2]),
-                    "area_per_lipid": float(system.area_per_lipid()),
-                    "thickness_proxy": float(system.membrane_thickness_proxy()),
-                    "barostat_scale": float(barostat_scale),
-                }
-            )
+            row = {
+                "step": float(step),
+                "time": float(step * config.dt),
+                "step_time": float(elapsed),
+                "temperature": float(temperature),
+                "pressure": float(pressure),
+                "kinetic": float(kinetic),
+                "potential": float(force_result.potential),
+                "total_energy": float(total_energy),
+                "box_x": float(system.box[0]),
+                "box_y": float(system.box[1]),
+                "box_z": float(system.box[2]),
+                "area_per_lipid": float(system.area_per_lipid()),
+                "thickness_proxy": float(system.membrane_thickness_proxy()),
+                "barostat_scale": float(barostat_scale),
+            }
+            if force_result.diagnostics:
+                for key, value in force_result.diagnostics.items():
+                    row[f"diag_{key}"] = float(value)
+            records.append(row)
 
     summary = summarize_records(
         records=records,
@@ -151,6 +153,7 @@ def run_simulation(
     return {
         "records": records,
         "summary": summary,
+        "final_system": system.copy(),
     }
 
 
@@ -195,6 +198,8 @@ def summarize_records(
         "thickness_proxy_drift_per_time": _linear_drift_per_time(time_values, thickness_values),
         "step_time_stats_mean": summarize_stats(step_times)["mean"],
     }
+
+    
 
 
 def write_records_csv(path: Path, records: list[dict[str, float]]) -> None:

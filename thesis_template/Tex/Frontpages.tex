@@ -4,32 +4,72 @@
 %-
 %-> 中文封面信息
 %-
-\confidential{}% 密级：只有涉密论文才填写
-\schoollogo{scale=0.2}{ShanghaiTechLogo}% 校徽
-%======论文题目 页眉显示 务必准确========
-\title{基于高斯和分解与随机批量采样的长程静电算法研究——面向全细胞分子动力学模拟}
-\author{田子杭}
-\ID{2022533131}
-\entranceYear{2022}
-\advisor{廖奇峰教授}% 指导教师：姓名
-\advisorsec{}% 第二指导老师：按情况填写
-\degree{学士}% 学位：学士、硕士、博士
-\degreetype{工学}% 学位类别：理学、工学、工程、医学等
-\major{计算机科学与技术}% 二级学科专业名称
-\institute{上海科技大学信息科学与技术学院}% 院系名称
-\chinesedate{二零二六\quad~年~\quad~六月}% 毕业日期：夏季为6月、冬季为12月
-%-
-%-> 英文封面信息
-%-
-\englishtitle{Research on Long-Range Electrostatics Algorithm Based on Sum-of-Gaussians Decomposition and Random Batch Sampling: Towards Whole-Cell Molecular Dynamics Simulation}
-\englishauthor{Tian Zihang}
-\englishadvisor{Supervisor: LiaoQiFeng}% 指导教师
-\englishdegree{Bachelor}% 学位：Bachelor, Master, Doctor。封面格式将根据英文学位名称自动切换，请确保拼写准确无误
-\englishdegreetype{Engineering}% 学位类别：Philosophy, Natural Science, Engineering, Economics, Agriculture 等
-\englishthesistype{thesis}% 论文类型： thesis, dissertation
-\englishmajor{Computer Science and Technology}% 二级学科专业名称
-\englishinstitute{School of Information Science and Technology}% 院系名称
-\englishdate{June / 2026}% 毕业日期：夏季为June、冬季为December
+% Public-safe defaults live here. Keep real identity metadata in the
+% ignored local override file `Tex/Frontpages.private.tex`.
+\newif\ifuseprivatefrontpage
+\useprivatefrontpagefalse
+\IfFileExists{Tex/PrivateBuildConfig.tex}{
+  \input{Tex/PrivateBuildConfig}
+}{}
+\ifuseprivatefrontpage
+  \IfFileExists{Tex/Frontpages.private.tex}{
+    \input{Tex/Frontpages.private}
+  }{
+    \confidential{}% 密级：只有涉密论文才填写
+    \schoollogo{scale=0.2}{ShanghaiTechLogo}% 校徽
+    %======论文题目 页眉显示 务必准确========
+    \title{基于高斯和分解与随机批量采样的长程静电算法研究——面向全细胞分子动力学模拟}
+    \author{匿名作者}
+    \ID{0000000000}
+    \entranceYear{2022}
+    \advisor{导师信息已隐去}% 指导教师：姓名
+    \advisorsec{}% 第二指导老师：按情况填写
+    \degree{学士}% 学位：学士、硕士、博士
+    \degreetype{工学}% 学位类别：理学、工学、工程、医学等
+    \major{计算机科学与技术}% 二级学科专业名称
+    \institute{上海科技大学信息科学与技术学院}% 院系名称
+    \chinesedate{二零二六\quad~年~\quad~六月}% 毕业日期：夏季为6月、冬季为12月
+    %- 
+    %-> 英文封面信息
+    %-
+    \englishtitle{Research on Long-Range Electrostatics Algorithm Based on Sum-of-Gaussians Decomposition and Random Batch Sampling: Towards Whole-Cell Molecular Dynamics Simulation}
+    \englishauthor{Anonymous}
+    \englishadvisor{Supervisor information withheld}% 指导教师
+    \englishdegree{Bachelor}% 学位：Bachelor, Master, Doctor。封面格式将根据英文学位名称自动切换，请确保拼写准确无误
+    \englishdegreetype{Engineering}% 学位类别：Philosophy, Natural Science, Engineering, Economics, Agriculture 等
+    \englishthesistype{thesis}% 论文类型： thesis, dissertation
+    \englishmajor{Computer Science and Technology}% 二级学科专业名称
+    \englishinstitute{School of Information Science and Technology}% 院系名称
+    \englishdate{June / 2026}% 毕业日期：夏季为June、冬季为December
+  }
+\else
+  \confidential{}% 密级：只有涉密论文才填写
+  \schoollogo{scale=0.2}{ShanghaiTechLogo}% 校徽
+  %======论文题目 页眉显示 务必准确========
+  \title{基于高斯和分解与随机批量采样的长程静电算法研究——面向全细胞分子动力学模拟}
+  \author{匿名作者}
+  \ID{0000000000}
+  \entranceYear{2022}
+  \advisor{导师信息已隐去}% 指导教师：姓名
+  \advisorsec{}% 第二指导老师：按情况填写
+  \degree{学士}% 学位：学士、硕士、博士
+  \degreetype{工学}% 学位类别：理学、工学、工程、医学等
+  \major{计算机科学与技术}% 二级学科专业名称
+  \institute{上海科技大学信息科学与技术学院}% 院系名称
+  \chinesedate{二零二六\quad~年~\quad~六月}% 毕业日期：夏季为6月、冬季为12月
+  %- 
+  %-> 英文封面信息
+  %-
+  \englishtitle{Research on Long-Range Electrostatics Algorithm Based on Sum-of-Gaussians Decomposition and Random Batch Sampling: Towards Whole-Cell Molecular Dynamics Simulation}
+  \englishauthor{Anonymous}
+  \englishadvisor{Supervisor information withheld}% 指导教师
+  \englishdegree{Bachelor}% 学位：Bachelor, Master, Doctor。封面格式将根据英文学位名称自动切换，请确保拼写准确无误
+  \englishdegreetype{Engineering}% 学位类别：Philosophy, Natural Science, Engineering, Economics, Agriculture 等
+  \englishthesistype{thesis}% 论文类型： thesis, dissertation
+  \englishmajor{Computer Science and Technology}% 二级学科专业名称
+  \englishinstitute{School of Information Science and Technology}% 院系名称
+  \englishdate{June / 2026}% 毕业日期：夏季为June、冬季为December
+\fi
 %-
 %-> 生成封面
 %-

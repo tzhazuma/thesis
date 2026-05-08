@@ -1,213 +1,343 @@
 \chapter{结果}\label{chap:results}
 
-\section{PPPM与RBSOG主基准测试}
+\section{实验套件总览}
 
-\subsection{三种子主基准结果}
+本章结果均来自 \path{results/thesis_suite/} 中的重新执行实验。与前一版只围绕少量主基准和批量扫描展开不同，本章将PPPM公平性扫描、10种子主基准、direct reference精度验证、规模扫描、长轨迹稳定性、参数消融、profiling和稳健统计统一纳入同一套自动化资产链路。所有表格和图像均由 \path{docs/report/generate_thesis_assets.py} 自动写入 \path{thesis_template/generated/}。
 
-本章所有数值均来自本文重新串行执行并核对的真实实验结果。主基准实验采用统一的代理膜体系设置：脂质分子数为128，溶剂粒子数为512，盒子尺寸为$16\times16\times20$（约化单位），积分步数为1000步，采样间隔为20步，PPPM与RBSOG使用一致的初始体系构造流程与随机种子集合。当前正文中引用的原始数据分别来自 \path{results/thesis_final_benchmark_main/}、\path{results/thesis_final_run_with_config/}、\path{results/thesis_final_batch_sweep/}、\path{results/thesis_benchmark_10seeds/} 与 JIT 消融目录。
+在公平性扫描之后，后续PPPM基线统一采用 $\ChosenPPPMGrid^3$ 网格；RBSOG默认采用 $P=\RecommendedBatch$、$M=12$、短程截断半径1.2。需要强调的是，$P=\RecommendedBatch$ 是RBSOG候选参数中的折中推荐，不表示其已经优于PPPM。
 
-表\ref{tab:benchmark_main}给出了三种子主基准实验的聚合结果。可以看到，在当前纯Python原型实现下，RBSOG的平均每步时间为0.02636秒，而PPPM为0.00393秒，前者约为后者的6.71倍。同时，RBSOG的压力方差均值为$4.898\times10^{-4}$，高于PPPM的$3.746\times10^{-4}$。因此，在当前实现与当前实验配置下，RBSOG既未在吞吐性能上优于PPPM，也未在压力波动控制上表现出更优结果。
+\section{PPPM网格公平性扫描}
+
+\subsection{时间-误差折中}
+
+表\ref{tab:fairness} 给出了PPPM网格扫描结果。随着网格从 $16^3$ 增大到 $64^3$，PPPM单步时间明显上升；力误差和压力误差并非严格单调下降，说明当前简化PPPM实现和代理体系下，网格加密并不自动等价于所有误差指标同步改善。按本文定义的公平性评分，$\FairnessGrid^3$ 被选为后续主基准网格，其相对力RMSE为\FairnessForceRMSE，压力相对误差为\FairnessPressureError。
 
 \begin{table}[htbp]
 \centering
-\caption{三种子主基准实验结果（真实实验数据）}
-\label{tab:benchmark_main}
+\caption{PPPM网格公平性扫描结果}
+\label{tab:fairness}
 \resizebox{\textwidth}{!}{%
-\begin{tabular}{lccccc}
-\hline
-\textbf{求解器} & \textbf{平均每步时间(s)} & \textbf{压力方差} & \textbf{温度均值} & \textbf{面积/脂质标准差} & \textbf{膜厚标准差} \\
-\hline
-PPPM & 0.00393 & 0.000375 & 1.032 & 0.00415 & 0.43412 \\
-RBSOG ($P=100$) & 0.02636 & 0.000490 & 1.149 & 0.00391 & 1.59899 \\
-\hline
-\end{tabular}
+\input{generated/fairness_table.tex}
 }
 \end{table}
 
-从结构代理指标看，RBSOG的面积/脂质标准差略低于PPPM，但膜厚代理量标准差显著更大。这说明在当前参数配置下，RBSOG在横向面积涨落上的表现与PPPM接近，而在膜法向厚度波动上更不稳定。仅凭单一结构指标无法支持“RBSOG整体更稳定”的结论。
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.78\textwidth]{generated/pppm_grid_tradeoff.png}
+\caption{PPPM网格时间-误差折中图。红色点为后续主基准采用的公平性推荐网格。}
+\label{fig:pppm_grid_tradeoff}
+\end{figure}
 
-\subsection{运行级统计与置信区间}
+该结果带来一个重要限定：本文后续结论评价的是当前原型与当前公平性选择下的相对表现，而不是成熟PME/PPPM生产实现的上限。换言之，即使在较粗网格PPPM基线下，RBSOG仍需接受性能和统计稳定性的实测检验。
 
-为了评估结果的稳健性，本文进一步对PPPM和RBSOG执行了10个随机种子的扩展基准测试，对应目录为 \path{results/thesis_benchmark_10seeds/}。表\ref{tab:run_stats}直接引用自动生成的运行级统计汇总。可以看到，PPPM在10次独立运行中的平均每步时间为$0.005330\pm0.000907$秒，95\%置信区间半宽为0.000649秒；RBSOG对应为$0.029147\pm0.003051$秒，95\%置信区间半宽为0.002183秒。相较之下，RBSOG不仅更慢，而且运行间波动也更大。
+\section{10种子主基准测试}
+
+\subsection{聚合结果}
+
+表\ref{tab:benchmark_main} 汇总了10个随机种子的主基准结果。PPPM平均每步时间为0.000699秒，RBSOG为0.025070秒，RBSOG约为PPPM的\RBSOGSlowdownVsPPPM 倍。压力方差方面，RBSOG均值为PPPM的\RBSOGVarianceRatioVsPPPM 倍，说明在当前默认参数下，RBSOG没有体现出压力波动优势。
 
 \begin{table}[htbp]
 \centering
-\caption{10种子运行级统计摘要（真实实验数据）}
+\caption{10种子主基准聚合结果}
+\label{tab:benchmark_main}
+\resizebox{\textwidth}{!}{%
+\input{generated/benchmark_table.tex}
+}
+\end{table}
+
+从结构代理量看，RBSOG的面积/脂质漂移率与PPPM同阶，但膜厚漂移为正且幅度更大。这说明RBSOG不能被简单描述为“结构更稳定”。当前结果更支持如下判断：RBSOG在部分横向结构量上与PPPM接近，但在法向膜厚代理量上引入了更明显的非稳态趋势。
+
+\subsection{运行级统计与效应量}
+
+表\ref{tab:run_stats} 给出了运行级均值、标准差和95\%置信区间。PPPM步时间置信区间半宽为\PPPMStepCI 秒，RBSOG为\RBSOGStepCI 秒。由于两者均值相差远大于区间宽度，步时间差距不是随机波动造成的。
+
+\begin{table}[htbp]
+\centering
+\caption{10种子运行级统计摘要}
 \label{tab:run_stats}
 \resizebox{\textwidth}{!}{%
 \input{generated/benchmark_stats_table.tex}
 }
 \end{table}
 
-在10种子统计下，RBSOG的平均步时约为PPPM的\RBSOGSlowdownVsPPPM 倍，且其压力方差均值明显高于PPPM。更值得注意的是，RBSOG的压力方差标准差远大于PPPM，这说明RBSOG在不同随机种子下的波动性更强，存在明显的种子敏感性。图\ref{fig:seed_scatter}所示的散点分布也支持这一判断：PPPM的点云更集中，而RBSOG在压力方差维度上呈现更长的离散尾部。
-
-\subsection{效应量分析}
-
-为了进一步评估两种方法差异的实际显著性，本文使用Cohen's $d$对10种子结果进行了效应量分析。表\ref{tab:effect_size}显示，步时指标的效应量达到10.580，属于极大的正向效应，说明RBSOG在运行时间上显著劣于PPPM；压力方差的效应量为0.595，也达到中等偏大的效应量等级，说明RBSOG在当前实现下并未提供更优的波动控制。
+表\ref{tab:effect_size} 进一步给出Cohen's $d$效应量。步时间指标的效应量达到35.391，属于极大效应；压力方差的效应量为0.404，属于中等效应，但压力方差标准差很大，表明RBSOG在不同随机种子下存在明显离散性。
 
 \begin{table}[htbp]
 \centering
-\caption{10种子效应量分析（真实实验数据）}
+\caption{PPPM与RBSOG主基准效应量分析}
 \label{tab:effect_size}
 \resizebox{\textwidth}{!}{%
 \input{generated/effect_size_table.tex}
 }
 \end{table}
 
-上述结果说明，若以当前代码实现作为评价对象，则RBSOG相对PPPM的主要结论应当是“尚处于明显落后阶段”，而不是“已经体现优势”。后续讨论和结论章节应据此保持克制。
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.78\textwidth]{generated/seed_scatter.png}
+\caption{主基准运行级散点图。左图为步时间，右图为压力方差。}
+\label{fig:seed_scatter}
+\end{figure}
 
-\section{批量大小扫描实验}
+图\ref{fig:seed_scatter} 显示，RBSOG步时间分布相对集中但整体远高于PPPM；压力方差则存在长尾种子。这一现象提示后续优化不仅要降低平均时间，也要控制随机采样带来的跨种子不稳定性。
 
-\subsection{性能与方差的权衡关系}
+\section{RBSOG批量大小扫描}
 
-为了分析RBSOG对批量大小参数$P$的敏感性，本文重新串行执行了批量大小扫描实验，对应目录为 \path{results/thesis_final_batch_sweep/}。扫描范围取$P\in\{50,100,200,400\}$，并使用与主基准相同的体系设置和3个随机种子。表\ref{tab:batch_sweep}引用自动生成的批量扫描汇总结果。
+\subsection{Pareto前沿与推荐点}
+
+表\ref{tab:batch_sweep} 展示 $P\in\{50,100,200,400\}$ 的批量扫描结果。所有候选点都在Pareto前沿上：小批量更快但压力方差更高，大批量降低压力方差但显著增加运行时间。在时间权重\ObjectiveTimeWeight、方差权重\ObjectiveVarianceWeight 的设置下，自动推荐 $P=\RecommendedBatch$。
 
 \begin{table}[htbp]
 \centering
-\caption{批量大小扫描结果（真实实验数据）}
+\caption{RBSOG批量大小扫描结果}
 \label{tab:batch_sweep}
 \resizebox{\textwidth}{!}{%
 \input{generated/sweep_table.tex}
 }
 \end{table}
 
-结果表明，随着$P$增大，RBSOG的平均每步时间近似单调上升；与此同时，压力方差整体呈下降趋势。$P=50$时方差劣化最明显，而$P=400$时压力方差已经略低于PPPM，但其平均每步时间也增至0.08675秒，约为PPPM的22.6倍。因此，在当前扫描范围内，并未观察到一个同时在速度和压力方差上都优于PPPM的批量大小，只存在“速度更差但方差更接近PPPM”与“速度相对较快但方差明显更差”之间的折中。
-
-\subsection{Pareto前沿与推荐参数}
-
-图\ref{fig:pareto}展示了批量大小扫描实验的Pareto前沿。由于4个候选点之间存在典型的速度-方差折中关系，因此它们全部位于Pareto前沿上。在时间权重为\ObjectiveTimeWeight、方差权重为\ObjectiveVarianceWeight 的设定下，自动推荐算法选择了$P=\RecommendedBatch$作为折中点，其乌托邦距离为0.19968，相对PPPM加速比为\RecommendedSpeedup，压力方差比为\RecommendedVarianceRatio。
-
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.78\textwidth]{generated/sweep_pareto.png}
-\caption{真实实验结果生成的批量大小Pareto前沿图。所有候选点均位于Pareto前沿上，推荐点为$P=\RecommendedBatch$。}
+\caption{RBSOG批量大小Pareto前沿。推荐点为 $P=\RecommendedBatch$。}
 \label{fig:pareto}
 \end{figure}
 
-这一推荐结果的含义是：在当前权重设定下，$P=100$在运行时间与压力方差之间提供了较平衡的折中。这里的“推荐”仅表示当前目标函数下的相对合理，而不代表该参数已经优于PPPM基线。
+推荐点相对PPPM的速度比为\RecommendedSpeedup，压力方差比为\RecommendedVarianceRatio。也就是说，$P=\RecommendedBatch$ 的意义是“在RBSOG内部提供较合理折中”，不是“相对PPPM已经达到加速”。
 
-\subsection{参数敏感性解释}
+\subsection{敏感性趋势}
 
-自动生成的敏感性图显示，RBSOG对批量大小高度敏感：小批量使长程采样噪声快速放大，而大批量则显著抬高采样成本。换言之，$P$控制的是一种典型的方差-成本平衡。在当前纯Python原型中，增大$P$的统计收益尚不足以抵消实现层开销，因此更大的批量会直接反映为更高的步时。
-
-\section{结构稳定性分析}
-
-\subsection{时间序列与结构代理量}
-
-为了分析结构稳定性，本文使用RBSOG单次长轨迹运行结果。其目录为：
-
-\noindent\path{results/thesis_final_run_with_config/}
-
-作为对照，PPPM结果取自：
-
-\noindent\path{results/thesis_final_benchmark_main/pppm/seed_42/}
-
-图\ref{fig:stability}展示了RBSOG运行的面积/脂质与膜厚代理量时间序列。由于该图基于真实运行记录生成，因此可直接反映当前参数配置下膜代理体系的演化行为。
+图\ref{fig:sweep_sensitivity} 显示，随着 $P$ 增大，RBSOG步时间基本上升，而压力方差比下降。这一趋势符合随机批量方法的基本预期：更多样本能降低估计噪声，但会直接增加每步采样和长程累积成本。
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.78\textwidth]{generated/stability_timeseries.png}
-\caption{RBSOG真实运行结果对应的结构稳定性时间序列图。上图为面积/脂质，下图为膜厚代理量。}
-\label{fig:stability}
+\includegraphics[width=0.78\textwidth]{generated/sweep_sensitivity.png}
+\caption{批量大小敏感性图。左轴为平均步时间，右轴为相对PPPM压力方差比。}
+\label{fig:sweep_sensitivity}
 \end{figure}
 
-从统计量上看，RBSOG单次运行的面积/脂质标准差为0.00390，漂移率为\AreaDrift；膜厚代理量标准差为1.54528，漂移率为\ThicknessDrift。相比之下，PPPM在对应种子下的面积/脂质标准差为0.00416，漂移率为-0.00706；膜厚代理量标准差为0.43412，漂移率为-0.66501。由此可见，RBSOG在面积/脂质这一指标上与PPPM接近，但膜厚代理量波动显著更大，且呈现持续增长趋势。这说明在当前RBSOG参数配置下，体系在膜法向方向存在更明显的非稳态行为。
+\section{Direct Reference精度验证}
 
-\subsection{漂移率比较}
+\subsection{批量大小对力误差的影响}
 
-表\ref{tab:drift}给出了用于结构解释的漂移率对比结果。PPPM数据来自下列目录：
-
-\noindent\path{results/thesis_final_benchmark_main/pppm/seed_42/}
-
-RBSOG数据来自：
-
-\noindent\path{results/thesis_final_run_with_config/}
-
-两者虽然不是同一条轨迹，但采用了一致的模拟参数，因此可以作为结构趋势的对照参考。
+表\ref{tab:accuracy_batch} 比较了不同体系规模下的相对力RMSE。总体上，RBSOG力误差随 $P$ 增大而下降，尤其在 $N=320$ 和 $N=640$ 上趋势较清晰。例如 $N=640$ 时，$P=25$ 的力RMSE为1.762，而 $P=400$ 降至0.942。这说明批量大小确实是控制随机估计误差的重要参数。
 
 \begin{table}[htbp]
 \centering
-\caption{结构稳定性漂移率对比（真实实验数据）}
-\label{tab:drift}
-\begin{tabular}{lcc}
-\hline
-\textbf{求解器} & \textbf{面积/脂质漂移率} & \textbf{膜厚漂移率} \\
-\hline
-PPPM & -0.00706 & -0.66501 \\
-RBSOG & \AreaDrift & \ThicknessDrift \\
-\hline
-\end{tabular}
+\caption{Direct reference下不同批量大小的相对力RMSE}
+\label{tab:accuracy_batch}
+\resizebox{\textwidth}{!}{%
+\input{generated/accuracy_batch_table.tex}
+}
 \end{table}
 
-该结果表明，RBSOG不能被简单描述为“结构更稳定”。更准确的说法是：在横向面积方向上，RBSOG与PPPM表现接近；但在膜厚代理量上，RBSOG表现出更强波动和更明显的正漂移。因此，当前阶段如果要进一步评价其结构稳定性，还需要更长轨迹和更多结构观测量的支撑。
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.78\textwidth]{generated/accuracy_force_vs_batch.png}
+\caption{RBSOG相对力RMSE随批量大小变化的趋势。}
+\label{fig:accuracy_batch}
+\end{figure}
 
-\section{JIT消融实验}
+值得注意的是，公平性选择出的PPPM $\ChosenPPPMGrid^3$ 网格在direct reference下并非高精度配置，其力RMSE也较高。因此，本文不能把当前PPPM精度结果外推为成熟PPPM方法的真实精度上限；它只表示当前公平性成本下的原型基线。
 
-\subsection{JIT对步时的影响}
+\subsection{SOG项数对误差的影响}
 
-为了分析实现层优化的影响，本文重新执行了JIT消融实验，对应目录分别为 \path{results/thesis_ablation_jit_on/} 和 \path{results/thesis_ablation_jit_off/}。表\ref{tab:jit}直接引用自动生成的消融结果。实验显示，在2个随机种子下，开启即时编译（just-in-time compilation, JIT）后，RBSOG的平均每步时间由0.168789秒下降到0.072693秒，获得了约\JITSpeedup 倍的加速，而压力方差保持不变。
+表\ref{tab:accuracy_terms} 展示了 $M$ 对力误差的影响。结果并非“$M$越大越好”：在当前拟合区间与非负权重裁剪策略下，$M=6$ 反而在三组体系上给出最低或接近最低的力RMSE，而 $M=18$ 和 $M=24$ 会显著放大误差。这个现象说明当前SOG核拟合仍然是RBSOG误差来源中的关键环节，简单增加高斯项数不能替代稳定的核参数优化。
 
 \begin{table}[htbp]
 \centering
-\caption{JIT消融实验结果（真实实验数据）}
+\caption{Direct reference下不同SOG项数的相对力RMSE}
+\label{tab:accuracy_terms}
+\resizebox{0.88\textwidth}{!}{%
+\input{generated/accuracy_terms_table.tex}
+}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.78\textwidth]{generated/accuracy_force_vs_sog_terms.png}
+\caption{RBSOG相对力RMSE随SOG项数变化的趋势。}
+\label{fig:accuracy_terms}
+\end{figure}
+
+\section{规模扫描实验}
+
+\subsection{平均步时间随规模变化}
+
+表\ref{tab:scaling} 和图\ref{fig:scaling_step} 给出了 $N=320,640,960,1280$ 的规模扫描结果。RBSOG在所有规模上都慢于PPPM，且慢速比从21.982扩大到\ScalingSlowdownAtMaxN。这说明在当前串行Python/JIT混合实现下，RBSOG尚未表现出更好的经验扩展性。
+
+\begin{table}[htbp]
+\centering
+\caption{规模扫描下的平均步时间与RBSOG相对PPPM慢速比}
+\label{tab:scaling}
+\resizebox{0.86\textwidth}{!}{%
+\input{generated/scaling_table.tex}
+}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.78\textwidth]{generated/scaling_step_time.png}
+\caption{PPPM与RBSOG平均步时间随粒子数变化的log-log曲线。}
+\label{fig:scaling_step}
+\end{figure}
+
+\subsection{经验复杂度斜率}
+
+表\ref{tab:scaling_fit} 给出对数-对数拟合结果。PPPM经验斜率为\ScalingExponentPPPM，RBSOG为\ScalingExponentRBSOG。由于当前规模范围有限，这些斜率不能被解释为理论复杂度证明，但它们清楚表明：在本文可运行规模内，RBSOG的时间增长更接近线性，而PPPM在该简化网格范围内增长更慢。
+
+\begin{table}[htbp]
+\centering
+\caption{规模扫描log-log经验斜率}
+\label{tab:scaling_fit}
+\input{generated/scaling_fit_table.tex}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.78\textwidth]{generated/scaling_slowdown_ratio.png}
+\caption{RBSOG相对PPPM慢速比随粒子数变化。}
+\label{fig:scaling_ratio}
+\end{figure}
+
+\section{长轨迹稳定性实验}
+
+\subsection{5000步统计摘要}
+
+表\ref{tab:long_stability} 汇总了5个随机种子、5000步长轨迹的结果。RBSOG长轨迹步时间约为PPPM的\LongSlowdownVsPPPM 倍；压力方差明显大于PPPM，但面积/脂质和膜厚代理量的标准差、漂移率反而低于PPPM。这个结果与短轨迹主基准形成互补：RBSOG在压力统计上仍不稳定，但部分结构代理量在长时间窗口中并未更差。
+
+\begin{table}[htbp]
+\centering
+\caption{5000步长轨迹稳定性摘要}
+\label{tab:long_stability}
+\resizebox{\textwidth}{!}{%
+\input{generated/long_stability_table.tex}
+}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.78\textwidth]{generated/rolling_area.png}
+\caption{长轨迹面积/脂质滚动均值。阴影表示跨种子标准差。}
+\label{fig:rolling_area}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.78\textwidth]{generated/rolling_thickness.png}
+\caption{长轨迹膜厚代理量滚动均值。阴影表示跨种子标准差。}
+\label{fig:rolling_thickness}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.78\textwidth]{generated/rolling_pressure.png}
+\caption{长轨迹压力滚动均值。RBSOG存在明显更大的压力波动。}
+\label{fig:rolling_pressure}
+\end{figure}
+
+长轨迹结果提示，结构代理量和压力方差不能相互替代。压力是对力误差和采样噪声更敏感的全局统计量，而面积/脂质和膜厚代理量在Berendsen控制与简化代理体系下可能表现出不同的平滑特征。因此，本研究不把任何单一指标作为“稳定性胜负”的唯一依据。
+
+\section{RBSOG参数消融与Profiling}
+
+\subsection{参数消融}
+
+表\ref{tab:ablation_summary} 给出了RBSOG参数消融中的三个代表性结论：最佳力误差配置出现在 $P=400,M=6$；最快运行配置为 $P=25,r_c=1.6$；最低压力方差配置为 $P=50,r_c=1.6$。三者并不重合，说明RBSOG不存在一个在当前扫描空间内同时支配速度、方差与力误差的单一参数组。
+
+\begin{table}[htbp]
+\centering
+\caption{RBSOG参数消融摘要}
+\label{tab:ablation_summary}
+\resizebox{0.92\textwidth}{!}{%
+\input{generated/ablation_summary_table.tex}
+}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.78\textwidth]{generated/ablation_error_heatmap.png}
+\caption{RBSOG力误差消融热力图。}
+\label{fig:ablation_error}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.78\textwidth]{generated/ablation_speed_heatmap.png}
+\caption{RBSOG运行时间消融热力图。}
+\label{fig:ablation_speed}
+\end{figure}
+
+\subsection{Profiling分解}
+
+表\ref{tab:profiling} 和图\ref{fig:profile} 给出profiling结果。PPPM耗时主要集中在FFT求解，占\PPPMFFTShare\%；RBSOG耗时则主要集中在随机采样、长程核计算和样本过滤三部分，分别约占\RBSOGSamplingShare\%、\RBSOGLongRangeShare\% 和\RBSOGFilterShare\%。
+
+\begin{table}[htbp]
+\centering
+\caption{PPPM与RBSOG组件耗时占比}
+\label{tab:profiling}
+\resizebox{\textwidth}{!}{%
+\input{generated/profiling_table.tex}
+}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.78\textwidth]{generated/profile_stacked_bar.png}
+\caption{求解器组件耗时堆叠图。}
+\label{fig:profile}
+\end{figure}
+
+该结果说明，当前RBSOG慢并非主要由短程近邻表造成，而是由随机样本生成、过滤和长程累积主导。因此，后续优化应优先减少长程采样路径的数据搬运、降低无效样本过滤成本，并把长程核进一步向连续内存和并行执行友好的形式改写。
+
+\subsection{JIT消融}
+
+表\ref{tab:jit} 和图\ref{fig:jit} 展示JIT消融结果。开启JIT后，RBSOG平均步时间从0.105101秒降至0.024610秒，获得\JITSpeedup 倍加速；压力方差比保持为\JITVarianceRatio。这说明JIT主要改变实现效率，而没有改变统计性质。
+
+\begin{table}[htbp]
+\centering
+\caption{RBSOG JIT消融结果}
 \label{tab:jit}
 \input{generated/jit_ablation_table.tex}
 \end{table}
 
-这一结果说明，RBSOG在当前实现下的性能确实受到解释器层开销影响，JIT优化能够显著改善内核执行效率。但即便如此，开启JIT后的RBSOG仍未达到PPPM的性能水平，因此后续优化仍需要同时考虑实现层提速与算法层的数据路径优化。
-
-\subsection{JIT对统计量的影响}
-
-图\ref{fig:jit}展示了JIT开启与关闭状态下的步时和压力方差对比。由于JIT只改变实现方式，而不改变数值算法本身，因此两组实验的压力方差几乎完全一致。这与预期一致，也说明JIT优化主要影响吞吐性能，而不应改变统计性质。
-
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.78\textwidth]{generated/jit_ablation.png}
-\caption{基于真实实验结果生成的JIT消融图。JIT显著降低了步时，但未改变压力方差。}
+\caption{RBSOG JIT开启/关闭下的步时间与压力方差对比。}
 \label{fig:jit}
 \end{figure}
 
-\section{十种子扩展统计实验}
+\section{稳健统计分析}
 
-\subsection{扩展实验结果}
-
-本文进一步运行了10个随机种子的扩展统计实验，用于检验主基准结论是否具有稳健性。表\ref{tab:10seeds}给出了简化后的统计摘要，图\ref{fig:seed_scatter}给出了每个种子下的散点分布。
+表\ref{tab:robust_stats} 给出了bootstrap比例区间和置换检验结果。步时间比例为\BootstrapStepRatio，95\% bootstrap区间为 $[\BootstrapStepRatioLow,\BootstrapStepRatioHigh]$，且置换检验 $p$ 值接近0，说明RBSOG较慢这一结论高度稳健。压力方差比例为\BootstrapVarianceRatio，但95\%区间为 $[\BootstrapVarianceRatioLow,\BootstrapVarianceRatioHigh]$，跨过1，且均值差置换检验不显著。这意味着“RBSOG平均压力方差更高”在当前样本中成立，但其统计不确定性显著大于步时间结论。
 
 \begin{table}[htbp]
 \centering
-\caption{10种子扩展统计实验摘要（真实实验数据）}
-\label{tab:10seeds}
-\begin{tabular}{lcccc}
-\hline
-\textbf{求解器} & \textbf{平均每步时间(s)} & \textbf{标准差} & \textbf{95\%置信区间半宽} & \textbf{压力方差均值} \\
-\hline
-PPPM & 0.005330 & 0.000907 & \PPPMStepCI & $3.600\times10^{-4}$ \\
-RBSOG & 0.029147 & 0.003051 & \RBSOGStepCI & $1.855\times10^{-3}$ \\
-\hline
-\end{tabular}
+\caption{主基准稳健统计分析}
+\label{tab:robust_stats}
+\resizebox{\textwidth}{!}{%
+\input{generated/robust_stats_table.tex}
+}
 \end{table}
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.78\textwidth]{generated/seed_scatter.png}
-\caption{10种子真实实验结果的运行级散点图。左图为步时，右图为压力方差。}
-\label{fig:seed_scatter}
+\includegraphics[width=0.78\textwidth]{generated/bootstrap_ratio_plot.png}
+\caption{RBSOG/PPPM均值比例的bootstrap 95\%置信区间。}
+\label{fig:bootstrap_ratio}
 \end{figure}
-
-扩展统计实验与三种子主基准的结论一致：RBSOG的性能与压力方差均落后于PPPM，而且在压力方差维度上表现出更大的种子间离散性。换言之，主基准得到的负向结论并非偶然样本波动，而是在更大样本下依然成立。
 
 \section{本章小结}
 
-基于本章重新执行并核对的真实实验结果，可以得到以下结论：
+基于完整实验套件，可以得到以下结论：
 
-（1）\textbf{在当前纯Python原型实现下，RBSOG的绝对运行速度显著落后于PPPM。}三种子主基准下平均每步时间约慢6.71倍，10种子统计下约慢\RBSOGSlowdownVsPPPM 倍。
+（1）在公平性选择后的 $\ChosenPPPMGrid^3$ PPPM基线下，RBSOG主基准步时间仍约慢\RBSOGSlowdownVsPPPM 倍，且这一结论在bootstrap和置换检验下非常稳健。
 
-（2）\textbf{RBSOG在当前实现阶段并未展现出更优的压力方差表现。}无论是三种子还是十种子统计，RBSOG的压力方差均值都高于PPPM，且种子间波动更大。
+（2）RBSOG压力方差均值高于PPPM，但跨种子波动较大，统计不确定性明显强于步时间结论；因此只能说当前默认参数下未体现压力稳定性优势，而不应过度外推。
 
-（3）\textbf{批量大小$P$体现出明显的性能-方差折中关系。}更大的$P$能够降低压力方差，但会显著增加运行时间；在当前加权目标下，$P=\RecommendedBatch$是较合理的折中点，而不是性能上的胜利点。
+（3）direct reference实验表明，增大 $P$ 往往能降低RBSOG力误差，而SOG项数并非越大越好；当前核拟合策略需要进一步优化。
 
-（4）\textbf{JIT优化能够显著改善RBSOG的实现性能。}开启JIT后步时可降低到原来的约43\%，说明当前原型仍有较大工程优化空间。
+（4）规模扫描显示，在 $N=320$ 到 $N=1280$ 范围内，RBSOG相对PPPM的慢速比随规模扩大而增加，当前实现尚未体现可扩展性优势。
 
-（5）\textbf{结构稳定性结论必须谨慎表述。}RBSOG在面积/脂质指标上与PPPM接近，但在膜厚代理量上波动更大、漂移更明显，因此不能简单宣称其具有整体结构稳定性优势。
+（5）Profiling表明RBSOG主要瓶颈位于随机采样、长程核计算和样本过滤，而非短程近邻表；JIT可带来\JITSpeedup 倍加速，但仍不足以弥合与PPPM的差距。
 
-综合来看，本章的真实实验结果更支持如下判断：RBSOG目前仍处于“方法原型验证”阶段，其价值主要体现在为通信规避型长程静电求解提供了一条可实现的研究路径，而不是已经在当前代码形态下超越PPPM。
+综合来看，当前实验更支持“RBSOG路线可实现、误差可调、瓶颈可定位”的原型验证结论，而不支持“当前实现已经优于PPPM”的性能结论。

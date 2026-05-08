@@ -17,7 +17,7 @@ Implemented solvers:
 ## Quick start
 
 ```bash
-cd /Users/azuma/Downloads/thesis
+# From the repository root
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -e .
@@ -71,7 +71,7 @@ See `docs/experiment_protocol.md` for a full benchmark workflow and `notebooks/r
 Generate report assets from current results and compile PDF:
 
 ```bash
-cd /Users/azuma/Downloads/thesis
+# From the repository root
 bash docs/report/build_report.sh
 ```
 

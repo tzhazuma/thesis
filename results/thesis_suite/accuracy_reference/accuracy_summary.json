@@ -1,0 +1,5 @@
+{
+  "summary_csv": "accuracy_summary.csv",
+  "force_vs_batch_plot": "accuracy_force_vs_batch.png",
+  "force_vs_sog_terms_plot": "accuracy_force_vs_sog_terms.png"
+}

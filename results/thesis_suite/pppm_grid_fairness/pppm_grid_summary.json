@@ -1,0 +1,5 @@
+{
+  "recommended_grid": 16,
+  "summary_csv": "pppm_grid_summary.csv",
+  "tradeoff_plot": "pppm_grid_tradeoff.png"
+}

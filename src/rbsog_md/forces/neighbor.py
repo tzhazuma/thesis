@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import time
 
 import numpy as np
 
@@ -172,6 +173,7 @@ class NeighborListCoulombSolver:
         rebuild_interval: int = 10,
         softening: float = 1e-12,
         use_numba: bool = True,
+        profile: bool = False,
     ) -> None:
         self.cutoff = float(cutoff)
         self.softening = float(softening)
@@ -181,6 +183,7 @@ class NeighborListCoulombSolver:
             rebuild_interval=rebuild_interval,
         )
         self.jit_enabled = bool(use_numba and _NUMBA_AVAILABLE)
+        self.profile = bool(profile)
 
     def compute(
         self,
@@ -189,18 +192,33 @@ class NeighborListCoulombSolver:
     ) -> ForceResult:
         del rng
 
+        total_t0 = time.perf_counter() if self.profile else 0.0
+        pair_t0 = time.perf_counter() if self.profile else 0.0
         pairs = self.neighbor_list.get_pairs(system)
+        pair_dt = float(time.perf_counter() - pair_t0) if self.profile else 0.0
         if pairs.size == 0:
             return ForceResult(
                 forces=np.zeros_like(system.positions),
                 potential=0.0,
                 virial=0.0,
+                diagnostics=(
+                    {
+                        "neighbor_total_time": float(time.perf_counter() - total_t0),
+                        "neighbor_pair_build_time": pair_dt,
+                        "neighbor_short_range_time": 0.0,
+                        "neighbor_pair_count": 0.0,
+                        "neighbor_jit_enabled": float(self.jit_enabled),
+                    }
+                    if self.profile
+                    else None
+                ),
             )
 
         cutoff_sq = self.cutoff * self.cutoff
         softening_sq = self.softening * self.softening
 
         if self.jit_enabled:
+            kernel_t0 = time.perf_counter() if self.profile else 0.0
             forces, potential, virial = _compute_short_range_numba(
                 positions=np.ascontiguousarray(system.positions, dtype=np.float64),
                 charges=np.ascontiguousarray(system.charges, dtype=np.float64),
@@ -209,13 +227,26 @@ class NeighborListCoulombSolver:
                 cutoff_sq=float(cutoff_sq),
                 softening_sq=float(softening_sq),
             )
+            kernel_dt = float(time.perf_counter() - kernel_t0) if self.profile else 0.0
             return ForceResult(
                 forces=forces,
                 potential=float(potential),
                 virial=float(virial),
+                diagnostics=(
+                    {
+                        "neighbor_total_time": float(time.perf_counter() - total_t0),
+                        "neighbor_pair_build_time": pair_dt,
+                        "neighbor_short_range_time": kernel_dt,
+                        "neighbor_pair_count": float(pairs.shape[0]),
+                        "neighbor_jit_enabled": float(self.jit_enabled),
+                    }
+                    if self.profile
+                    else None
+                ),
             )
 
-        return self._compute_vectorized(
+        kernel_t0 = time.perf_counter() if self.profile else 0.0
+        result = self._compute_vectorized(
             positions=system.positions,
             charges=system.charges,
             box=system.box,
@@ -223,6 +254,16 @@ class NeighborListCoulombSolver:
             cutoff_sq=cutoff_sq,
             softening_sq=softening_sq,
         )
+        kernel_dt = float(time.perf_counter() - kernel_t0) if self.profile else 0.0
+        if self.profile:
+            result.diagnostics = {
+                "neighbor_total_time": float(time.perf_counter() - total_t0),
+                "neighbor_pair_build_time": pair_dt,
+                "neighbor_short_range_time": kernel_dt,
+                "neighbor_pair_count": float(pairs.shape[0]),
+                "neighbor_jit_enabled": float(self.jit_enabled),
+            }
+        return result
 
     def _compute_vectorized(
         self,

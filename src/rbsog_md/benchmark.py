@@ -26,12 +26,13 @@ def create_solver(
     neighbor_skin: float = 0.3,
     neighbor_rebuild_interval: int = 10,
     use_numba: bool = True,
+    profile: bool = False,
 ) -> Any:
     name = solver_name.lower().strip()
     if name == "direct":
-        return DirectCoulombSolver(cutoff=None)
+        return DirectCoulombSolver(cutoff=None, profile=profile)
     if name == "pppm":
-        return PPPMSolver(grid_shape=grid_shape)
+        return PPPMSolver(grid_shape=grid_shape, profile=profile)
     if name == "rbsog":
         config = RBSOGConfig(
             batch_size=batch_size,
@@ -40,6 +41,7 @@ def create_solver(
             neighbor_skin=neighbor_skin,
             neighbor_rebuild_interval=neighbor_rebuild_interval,
             use_numba=use_numba,
+            profile=profile,
         )
         return RBSOGSolver(config=config)
     raise ValueError(f"Unsupported solver: {solver_name}")
@@ -61,6 +63,7 @@ def run_benchmark(
     neighbor_skin: float,
     neighbor_rebuild_interval: int,
     use_numba: bool,
+    profile: bool = False,
 ) -> dict[str, Any]:
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -87,6 +90,7 @@ def run_benchmark(
                 neighbor_skin=neighbor_skin,
                 neighbor_rebuild_interval=neighbor_rebuild_interval,
                 use_numba=use_numba,
+                profile=profile,
             )
 
             result = run_simulation(
@@ -144,9 +148,10 @@ def run_batch_size_sweep(
     sog_terms: int,
     neighbor_skin: float,
     neighbor_rebuild_interval: int,
-    use_numba: bool,
-    objective_time_weight: float,
-    objective_variance_weight: float,
+        use_numba: bool,
+        objective_time_weight: float,
+        objective_variance_weight: float,
+        profile: bool = False,
 ) -> dict[str, Any]:
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -180,6 +185,7 @@ def run_batch_size_sweep(
         neighbor_skin=neighbor_skin,
         neighbor_rebuild_interval=neighbor_rebuild_interval,
         use_numba=use_numba,
+        profile=profile,
     )
     baseline_row = _find_solver_row(baseline_result["summary"]["by_solver"], "pppm")
     baseline_step_time = float(baseline_row["mean_step_time"])
@@ -204,6 +210,7 @@ def run_batch_size_sweep(
             neighbor_skin=neighbor_skin,
             neighbor_rebuild_interval=neighbor_rebuild_interval,
             use_numba=use_numba,
+            profile=profile,
         )
         rbsog_row = _find_solver_row(single_result["summary"]["by_solver"], "rbsog")
 

@@ -1,0 +1,2 @@
+solver,n_runs,mean_step_time,pressure_variance,temperature_mean,energy_drift_per_time,area_per_lipid_std,thickness_proxy_std,area_per_lipid_drift_per_time,thickness_proxy_drift_per_time
+rbsog,2.0,0.04178177468218729,7.845808285913527e-06,1.00698012283853,255.6108797795796,0.0008655682264126587,0.05649872387222677,-0.0068584456955706795,0.3957002212706933

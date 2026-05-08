@@ -15,6 +15,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
 def _read_csv_rows(path: Path) -> list[dict[str, str]]:
     if not path.exists():
         raise FileNotFoundError(f"Missing CSV file: {path}")
@@ -51,6 +54,13 @@ def _fmt_pm(mean: float, std: float, digits: int = 6) -> str:
     if mean != mean or std != std:
         return "nan"
     return f"{mean:.{digits}f} $\\pm$ {std:.{digits}f}"
+
+
+def _path_for_manifest(path: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(REPO_ROOT))
+    except ValueError:
+        return str(path)
 
 
 def _escape_tex(text: str) -> str:
@@ -766,14 +776,14 @@ def main() -> None:
     )
 
     manifest = {
-        "benchmark_summary": str(args.benchmark_summary),
-        "benchmark_runs": str(args.benchmark_runs),
-        "sweep_summary": str(args.sweep_summary),
-        "stability_summary": str(args.stability_summary),
-        "run_config": str(args.run_config),
-        "paper_table_csv": str(paper_table_path),
-        "jit_on_summary": str(args.jit_on_summary),
-        "jit_off_summary": str(args.jit_off_summary),
+        "benchmark_summary": _path_for_manifest(args.benchmark_summary),
+        "benchmark_runs": _path_for_manifest(args.benchmark_runs),
+        "sweep_summary": _path_for_manifest(args.sweep_summary),
+        "stability_summary": _path_for_manifest(args.stability_summary),
+        "run_config": _path_for_manifest(args.run_config),
+        "paper_table_csv": _path_for_manifest(paper_table_path),
+        "jit_on_summary": _path_for_manifest(args.jit_on_summary),
+        "jit_off_summary": _path_for_manifest(args.jit_off_summary),
         "generated_files": [
             "benchmark_table.tex",
             "benchmark_stats_table.tex",

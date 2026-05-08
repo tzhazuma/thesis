@@ -13,6 +13,7 @@ class ForceResult:
     forces: np.ndarray
     potential: float
     virial: float
+    diagnostics: dict[str, float] | None = None
 
 
 class ForceSolver(Protocol):

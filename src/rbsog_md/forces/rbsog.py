@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import time
 
 import numpy as np
 
@@ -102,6 +103,7 @@ class RBSOGConfig:
     neighbor_skin: float = 0.3
     neighbor_rebuild_interval: int = 10
     use_numba: bool = True
+    profile: bool = False
 
 
 class RBSOGSolver:
@@ -114,11 +116,13 @@ class RBSOGSolver:
             skin=config.neighbor_skin,
             rebuild_interval=config.neighbor_rebuild_interval,
             use_numba=config.use_numba,
+            profile=config.profile,
         )
         self.long_range_jit_enabled = bool(config.use_numba and _NUMBA_AVAILABLE)
         self.kernel: SOGKernel | None = None
         self.kernel_box: np.ndarray | None = None
         self._last_diagnostics: dict[str, float] = {}
+        self.profile = bool(config.profile)
 
     def _ensure_kernel(self, box: np.ndarray) -> None:
         if self.kernel is not None and self.kernel_box is not None and np.allclose(box, self.kernel_box):
@@ -139,10 +143,13 @@ class RBSOGSolver:
         if rng is None:
             rng = np.random.default_rng()
 
+        total_t0 = time.perf_counter() if self.profile else 0.0
         self._ensure_kernel(system.box)
         assert self.kernel is not None
 
+        short_t0 = time.perf_counter() if self.profile else 0.0
         short_result = self.short_range_solver.compute(system)
+        short_dt = float(time.perf_counter() - short_t0) if self.profile else 0.0
         forces = short_result.forces.copy()
         potential = short_result.potential
         virial = short_result.virial
@@ -158,12 +165,17 @@ class RBSOGSolver:
         r_min_sq = self.config.r_min * self.config.r_min
 
         q_abs = np.abs(charges) + 1e-6
+        proposal_t0 = time.perf_counter() if self.profile else 0.0
         proposal = q_abs**self.config.importance_exponent
         proposal /= np.sum(proposal)
+        proposal_dt = float(time.perf_counter() - proposal_t0) if self.profile else 0.0
 
+        sample_t0 = time.perf_counter() if self.profile else 0.0
         i_all = rng.choice(n_particles, size=m_samples, p=proposal)
         j_all = rng.choice(n_particles, size=m_samples, p=proposal)
+        sample_dt = float(time.perf_counter() - sample_t0) if self.profile else 0.0
 
+        filter_t0 = time.perf_counter() if self.profile else 0.0
         mask_not_self = i_all != j_all
         if not np.any(mask_not_self):
             self._last_diagnostics = {
@@ -172,7 +184,7 @@ class RBSOGSolver:
                 "acceptance_ratio": 0.0,
                 "jit_enabled": float(self.short_range_solver.jit_enabled),
             }
-            return ForceResult(forces=forces, potential=potential, virial=virial)
+            return ForceResult(forces=forces, potential=potential, virial=virial, diagnostics=self._profiling_payload(short_result, total_t0, short_dt, proposal_dt, sample_dt, 0.0, 0.0, m_samples, 0))
 
         i_idx = i_all[mask_not_self]
         j_idx = j_all[mask_not_self]
@@ -180,6 +192,7 @@ class RBSOGSolver:
         displacement = minimum_image(positions[j_idx] - positions[i_idx], system.box)
         r_sq = np.einsum("ij,ij->i", displacement, displacement)
         mask_long = (r_sq > cutoff_sq) & (r_sq > r_min_sq)
+        filter_dt = float(time.perf_counter() - filter_t0) if self.profile else 0.0
         if not np.any(mask_long):
             self._last_diagnostics = {
                 "accepted_samples": 0.0,
@@ -187,7 +200,7 @@ class RBSOGSolver:
                 "acceptance_ratio": 0.0,
                 "jit_enabled": float(self.short_range_solver.jit_enabled),
             }
-            return ForceResult(forces=forces, potential=potential, virial=virial)
+            return ForceResult(forces=forces, potential=potential, virial=virial, diagnostics=self._profiling_payload(short_result, total_t0, short_dt, proposal_dt, sample_dt, filter_dt, 0.0, m_samples, 0))
 
         i_valid = i_idx[mask_long]
         j_valid = j_idx[mask_long]
@@ -197,6 +210,7 @@ class RBSOGSolver:
         pair_prob = proposal[i_valid] * proposal[j_valid]
         sample_weights = 1.0 / (m_samples * pair_prob)
 
+        long_t0 = time.perf_counter() if self.profile else 0.0
         if self.long_range_jit_enabled:
             long_forces, long_potential, long_virial = _accumulate_sog_long_range_numba(
                 n_particles=int(n_particles),
@@ -224,6 +238,7 @@ class RBSOGSolver:
             pair_potential = qij * self.kernel.evaluate_from_r_sq(r_sq_valid)
             potential += float(np.sum(0.5 * sample_weights * pair_potential))
             virial += float(np.sum(0.5 * sample_weights * np.einsum("ij,ij->i", disp_valid, pair_force)))
+        long_dt = float(time.perf_counter() - long_t0) if self.profile else 0.0
 
         self._last_diagnostics = {
             "accepted_samples": float(i_valid.size),
@@ -233,7 +248,54 @@ class RBSOGSolver:
             "long_range_jit_enabled": float(self.long_range_jit_enabled),
         }
 
-        return ForceResult(forces=forces, potential=potential, virial=virial)
+        return ForceResult(
+            forces=forces,
+            potential=potential,
+            virial=virial,
+            diagnostics=self._profiling_payload(
+                short_result=short_result,
+                total_t0=total_t0,
+                short_dt=short_dt,
+                proposal_dt=proposal_dt,
+                sample_dt=sample_dt,
+                filter_dt=filter_dt,
+                long_dt=long_dt,
+                requested_samples=m_samples,
+                accepted_samples=int(i_valid.size),
+            ),
+        )
+
+    def _profiling_payload(
+        self,
+        short_result: ForceResult,
+        total_t0: float,
+        short_dt: float,
+        proposal_dt: float,
+        sample_dt: float,
+        filter_dt: float,
+        long_dt: float,
+        requested_samples: int,
+        accepted_samples: int,
+    ) -> dict[str, float] | None:
+        if not self.profile:
+            return None
+
+        payload = {
+            "rbsog_total_time": float(time.perf_counter() - total_t0),
+            "rbsog_short_range_time": short_dt,
+            "rbsog_proposal_time": proposal_dt,
+            "rbsog_sampling_time": sample_dt,
+            "rbsog_filter_time": filter_dt,
+            "rbsog_long_range_time": long_dt,
+            "rbsog_requested_samples": float(requested_samples),
+            "rbsog_accepted_samples": float(accepted_samples),
+            "rbsog_acceptance_ratio": float(accepted_samples / max(requested_samples, 1)),
+            "rbsog_short_range_jit_enabled": float(self.short_range_solver.jit_enabled),
+            "rbsog_long_range_jit_enabled": float(self.long_range_jit_enabled),
+        }
+        if short_result.diagnostics:
+            payload.update(short_result.diagnostics)
+        return payload
 
     def kernel_report(self) -> dict[str, float]:
         if self.kernel is None:

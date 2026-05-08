@@ -1,0 +1,8 @@
+{
+  "area_per_lipid_mean": 3.172667420217919,
+  "area_per_lipid_std": 0.0012859340393159967,
+  "area_per_lipid_drift_per_time": -0.0053125203072091,
+  "thickness_proxy_mean": 8.574532136736183,
+  "thickness_proxy_std": 0.44663274932883823,
+  "thickness_proxy_drift_per_time": 1.789210436254606
+}
