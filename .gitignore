@@ -20,6 +20,8 @@ thesis_template/Style/texput.log
 thesis_template/Tex/Frontpages.private.tex
 thesis_template/Tex/PrivateBuildConfig.tex
 thesis_template/Tmp/
+thesis_template/ThesisFinal.*
+thesis_template/ThesisPrivate.*
 
 # Report build artifacts
 docs/report/build_report_run.log
