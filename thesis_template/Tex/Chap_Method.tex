@@ -10,7 +10,7 @@
 
 （3）如果当前实现尚未优于PPPM，那么瓶颈主要位于哪些实现阶段，后续是否存在明确的优化方向。
 
-围绕这三个问题，本文将实验流程组织为一条统一的数据管线：首先由 \texttt{python -m rbsog\_md.studies --out-root results/thesis\_suite} 生成完整实验套件；随后由 \texttt{docs/report/generate\_thesis\_assets.py} 把结果目录汇总为 \texttt{thesis\_template/generated/} 中的表格、图像和宏定义；最后通过 \texttt{thesis\_template/build\_public\_thesis.sh} 进行公开安全版论文编译。这样做的目的，是让章节中的关键数字、图表和实验目录之间保持单一来源，降低手工拷贝带来的不一致风险。
+围绕这三个问题，本文将实验流程组织为一条统一的数据管线：由标准命令行生成完整实验套件，由 \texttt{generate\_thesis\_assets.py} 把结果汇总为表格、图像和宏定义，最后通过公开构建脚本编译。这样做的目的，是让章节中的关键数字、图表和实验目录之间保持单一来源，降低手工拷贝带来的不一致风险。
 
 \section{代理膜体系与动力学框架}
 
@@ -201,7 +201,7 @@ s_k = \frac{\bar t_k}{\bar t_{\mathrm{total}}},
 
 \section{自动化资产生成}
 
-本文的论文图表并不是手工插图，而是由实验输出自动生成。\texttt{generate\_thesis\_assets.py} 读取 \texttt{results/thesis\_suite/} 中的CSV、JSON和PNG产物，生成两类内容：
+本文的论文图表并不是手工插图，而是由实验输出自动生成。资产生成脚本读取实验套件中的CSV、JSON和PNG产物，生成两类内容：
 
 （1）供正文直接 \texttt{\textbackslash input} 的 \texttt{*.tex} 表格；
 
